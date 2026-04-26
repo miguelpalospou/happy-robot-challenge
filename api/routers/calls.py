@@ -8,6 +8,7 @@ from models import (
     CallLogRequest, 
     CallUpdateRequest, 
     CallClassifyRequest,
+    AgreementRequest,
     Call
 )
 
@@ -15,35 +16,38 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/log", response_model=Call)
+@router.post("/log")
 async def log_call(request: CallLogRequest):
     """
-    Log a new inbound call from a carrier.
-    Called at the start of each call.
+    Log a call from a carrier.
+    Uses UPSERT - creates new or updates existing call record.
+    Called after call ends by HappyRobot.
     """
     try:
         supabase = get_supabase()
-        
-        carrier_id = request.carrier_id
-        if request.mc_number and not carrier_id:
-            carrier_result = supabase.table("carriers")\
-                .select("id")\
-                .ilike("mc_number", f"%{request.mc_number}%")\
-                .execute()
-            if carrier_result.data:
-                carrier_id = carrier_result.data[0]["id"]
         
         call_record = {
             "call_id": request.call_id,
             "mc_number": request.mc_number,
             "phone_number": request.phone_number,
-            "carrier_id": carrier_id,
-            "call_start_time": datetime.utcnow().isoformat()
+            "carrier_name": request.carrier_name,
         }
         
-        result = supabase.table("calls").insert(call_record).execute()
+        # Remove None values
+        call_record = {k: v for k, v in call_record.items() if v is not None}
         
-        return Call(**result.data[0])
+        # Try to update existing call first
+        result = supabase.table("calls")\
+            .update(call_record)\
+            .eq("call_id", request.call_id)\
+            .execute()
+        
+        # If no existing call, create new one
+        if not result.data:
+            call_record["call_start_time"] = datetime.utcnow().isoformat()
+            result = supabase.table("calls").insert(call_record).execute()
+        
+        return {"message": "Call logged", "call_id": request.call_id}
         
     except Exception as e:
         logger.error(f"Error logging call: {e}")
@@ -89,6 +93,7 @@ async def classify_call(call_id: str, request: CallClassifyRequest):
     """
     Classify the call outcome and carrier sentiment.
     Called at the end of each call.
+    Will create call record if it doesn't exist.
     """
     try:
         supabase = get_supabase()
@@ -108,19 +113,24 @@ async def classify_call(call_id: str, request: CallClassifyRequest):
         if request.extracted_data:
             update_data["extracted_data"] = request.extracted_data
         
+        if request.transcript:
+            update_data["transcript"] = request.transcript
+        
+        # Try to update existing call
         result = supabase.table("calls")\
             .update(update_data)\
             .eq("call_id", call_id)\
             .execute()
         
+        # If no call found, create one with classification data
         if not result.data:
-            result = supabase.table("calls")\
-                .update(update_data)\
-                .eq("id", call_id)\
-                .execute()
-        
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Call not found")
+            logger.info(f"Call {call_id} not found for classification, creating new record")
+            insert_data = {
+                "call_id": call_id,
+                "call_start_time": datetime.utcnow().isoformat(),
+                **update_data
+            }
+            result = supabase.table("calls").insert(insert_data).execute()
         
         return {
             "message": "Call classified successfully",
@@ -139,49 +149,81 @@ async def classify_call(call_id: str, request: CallClassifyRequest):
 @router.put("/{call_id}/agreement")
 async def record_agreement(
     call_id: str,
-    load_id: str,
-    agreed_rate: float,
-    carrier_name: Optional[str] = None
+    request: AgreementRequest
 ):
     """
     Record an agreed price and mark call for transfer to sales rep.
     Called when negotiation succeeds.
+    Accepts JSON body: {"load_id": "...", "agreed_rate": 3500, "carrier_name": "..."}
+    load_id can be either UUID or human-readable (e.g., "LD-2024-001")
+    Will auto-create a call record if one doesn't exist.
     """
     try:
         supabase = get_supabase()
         
+        # Handle agreed_rate as string or number
+        agreed_rate = request.agreed_rate
+        if isinstance(agreed_rate, str):
+            agreed_rate = float(agreed_rate.replace('$', '').replace(',', ''))
+        
+        # Resolve load_id to UUID if it's human-readable
+        load_uuid = request.load_id
+        if request.load_id and not request.load_id.startswith(('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')):
+            # Looks like human-readable ID (e.g., "LD-2024-001"), look up UUID
+            load_lookup = supabase.table("loads").select("id").eq("load_id", request.load_id).execute()
+            if load_lookup.data:
+                load_uuid = load_lookup.data[0]["id"]
+        
         update_data = {
-            "load_id": load_id,
+            "load_id": load_uuid,
             "agreed_rate": agreed_rate,
-            "carrier_name": carrier_name,
+            "carrier_name": request.carrier_name,
+            "mc_number": request.mc_number,
             "transferred_at": datetime.utcnow().isoformat(),
             "outcome": "transferred_to_rep"
         }
         
+        # Try to update existing call by call_id (string identifier)
         result = supabase.table("calls")\
             .update(update_data)\
             .eq("call_id", call_id)\
             .execute()
         
+        # If no call found, create one
         if not result.data:
-            result = supabase.table("calls")\
-                .update(update_data)\
-                .eq("id", call_id)\
+            logger.info(f"Call {call_id} not found, creating new record")
+            insert_data = {
+                "call_id": call_id,
+                "load_id": load_uuid,
+                "agreed_rate": agreed_rate,
+                "carrier_name": request.carrier_name,
+                "mc_number": request.mc_number,
+                "transferred_at": datetime.utcnow().isoformat(),
+                "outcome": "transferred_to_rep",
+                "call_start_time": datetime.utcnow().isoformat()
+            }
+            result = supabase.table("calls").insert(insert_data).execute()
+        
+        # Update load with carrier assignment
+        if load_uuid:
+            load_update = {
+                "status": "booked",
+                "assigned_mc_number": request.mc_number,
+                "assigned_carrier_name": request.carrier_name,
+                "booked_at": datetime.utcnow().isoformat()
+            }
+            supabase.table("loads")\
+                .update(load_update)\
+                .eq("id", load_uuid)\
                 .execute()
         
-        if not result.data:
-            raise HTTPException(status_code=404, detail="Call not found")
-        
-        supabase.table("loads")\
-            .update({"status": "pending"})\
-            .eq("id", load_id)\
-            .execute()
-        
         return {
-            "message": "Agreement recorded, ready for transfer",
+            "message": "Agreement recorded, load booked",
             "call_id": call_id,
-            "load_id": load_id,
-            "agreed_rate": agreed_rate
+            "load_id": request.load_id,
+            "agreed_rate": agreed_rate,
+            "carrier_name": request.carrier_name,
+            "mc_number": request.mc_number
         }
         
     except HTTPException:

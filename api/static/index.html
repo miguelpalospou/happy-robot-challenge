@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Robot Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #111827; }
+        .card { background: #1f2937; border: 1px solid #374151; }
+        .card-light { background: #374151; }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <!-- Header -->
+    <header class="bg-black text-white py-4 px-8 shadow-lg">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center">
+                <img src="/static/acme-logo.png" alt="ACME Logistics" class="h-10">
+            </div>
+            <div class="flex items-center gap-4">
+                <img src="/static/happyrobot-icon.png" alt="HappyRobot" class="h-12 invert">
+                <button onclick="refreshData()" class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition text-sm">
+                    <span id="refresh-icon">Refresh</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-8 py-8">
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <p class="text-gray-400 text-sm">Total Calls</p>
+                <p class="text-3xl font-bold text-white" id="total-calls">-</p>
+                <p class="text-green-400 text-sm" id="calls-today">0 today</p>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <p class="text-gray-400 text-sm">Conversion Rate</p>
+                <p class="text-3xl font-bold text-white" id="conversion-rate">-</p>
+                <p class="text-blue-400 text-sm" id="deals-count">0 deals</p>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <p class="text-gray-400 text-sm">Total Revenue</p>
+                <p class="text-3xl font-bold text-green-400" id="total-revenue">-</p>
+                <p class="text-gray-400 text-sm" id="avg-rate">Avg $0/load</p>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <p class="text-gray-400 text-sm">Unique Carriers</p>
+                <p class="text-3xl font-bold text-white" id="unique-carriers">-</p>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <p class="text-gray-400 text-sm">Loads Booked</p>
+                <p class="text-3xl font-bold text-purple-400" id="loads-booked">-</p>
+                <p class="text-gray-400 text-sm" id="loads-available">0 available</p>
+            </div>
+        </div>
+
+        <!-- Margin Analysis -->
+        <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700 mb-8">
+            <h2 class="text-lg font-semibold text-white mb-4">Negotiation Margin Analysis</h2>
+            <div class="grid grid-cols-4 gap-6">
+                <div class="text-center p-4 bg-gray-700/50 rounded-lg">
+                    <p class="text-gray-400 text-sm" id="margin-label">Price vs Loadboard</p>
+                    <p class="text-2xl font-bold text-white" id="avg-discount">-</p>
+                    <p class="text-xs text-gray-500" id="margin-hint">vs loadboard rate</p>
+                </div>
+                <div class="text-center p-4 bg-gray-700/50 rounded-lg">
+                    <p class="text-gray-400 text-sm">Margin Impact</p>
+                    <p class="text-2xl font-bold text-white" id="margin-impact">-</p>
+                    <p class="text-xs text-gray-500">vs Loadboard Rates</p>
+                </div>
+                <div class="text-center p-4 bg-gray-700/50 rounded-lg">
+                    <p class="text-gray-400 text-sm">Avg Deal Size</p>
+                    <p class="text-2xl font-bold text-blue-400" id="avg-deal-size">-</p>
+                    <p class="text-xs text-gray-500">Per booking</p>
+                </div>
+                <div class="text-center p-4 bg-gray-700/50 rounded-lg">
+                    <p class="text-gray-400 text-sm">Deals Analyzed</p>
+                    <p class="text-2xl font-bold text-white" id="deals-analyzed">-</p>
+                    <p class="text-xs text-gray-500">With rate data</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <h2 class="text-lg font-semibold text-white mb-4">Call Outcomes</h2>
+                <div class="h-64">
+                    <canvas id="outcomes-chart"></canvas>
+                </div>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <h2 class="text-lg font-semibold text-white mb-4">Carrier Sentiment</h2>
+                <div class="h-64">
+                    <canvas id="sentiment-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Time Charts -->
+        <div class="grid md:grid-cols-2 gap-6 mb-8">
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <h2 class="text-lg font-semibold text-white mb-4">Calls Over Time</h2>
+                <div class="h-64">
+                    <canvas id="calls-time-chart"></canvas>
+                </div>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <h2 class="text-lg font-semibold text-white mb-4">Revenue by Day</h2>
+                <div class="h-64">
+                    <canvas id="revenue-time-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row -->
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <h2 class="text-lg font-semibold text-white mb-4">Top Lanes (Booked)</h2>
+                <div id="top-lanes" class="space-y-2">
+                    <p class="text-gray-400">Loading...</p>
+                </div>
+            </div>
+            <div class="bg-gray-800/50 backdrop-blur rounded-xl p-6 border border-gray-700">
+                <h2 class="text-lg font-semibold text-white mb-4">Equipment Booked</h2>
+                <div class="h-48">
+                    <canvas id="equipment-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-8 text-center text-gray-500 text-sm">
+            Last updated: <span id="last-updated">-</span>
+        </footer>
+    </main>
+
+    <script>
+        const API_KEY = 'hr-carrier-sales-2024';
+        let outcomesChart, sentimentChart, callsTimeChart, revenueTimeChart;
+
+        async function fetchData(endpoint) {
+            try {
+                const res = await fetch(endpoint, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                if (res.ok) return await res.json();
+            } catch (e) {
+                console.error('Fetch error:', e);
+            }
+            return null;
+        }
+
+        async function refreshData() {
+            document.getElementById('refresh-icon').textContent = '⏳';
+            
+            // Fetch metrics summary
+            const summary = await fetchData('/metrics/summary');
+            const callMetrics = await fetchData('/metrics/calls');
+            
+            if (summary) {
+                document.getElementById('total-calls').textContent = summary.total_calls || 0;
+                document.getElementById('unique-carriers').textContent = summary.unique_carriers || 0;
+                document.getElementById('total-revenue').textContent = '$' + (summary.total_agreed_value || 0).toLocaleString();
+                document.getElementById('loads-booked').textContent = summary.booked_loads || 0;
+                document.getElementById('loads-available').textContent = (summary.available_loads || 0) + ' available';
+                
+                // Use booked_loads for conversion rate
+                const bookedLoads = summary.booked_loads || summary.successful_deals || 0;
+                const convRate = summary.total_calls > 0 
+                    ? ((bookedLoads / summary.total_calls) * 100).toFixed(1) 
+                    : 0;
+                document.getElementById('conversion-rate').textContent = convRate + '%';
+                document.getElementById('deals-count').textContent = bookedLoads + ' booked';
+                
+                const avgRate = bookedLoads > 0 
+                    ? Math.round((summary.total_agreed_value || 0) / bookedLoads)
+                    : 0;
+                document.getElementById('avg-rate').textContent = 'Avg $' + avgRate.toLocaleString() + '/load';
+            }
+            
+            // Update calls today from call metrics
+            if (callMetrics) {
+                document.getElementById('calls-today').textContent = (callMetrics.calls_today || 0) + ' today';
+            }
+
+            // Fetch calls for charts
+            const callsData = await fetchData('/calls/?limit=100');
+            if (callsData && callsData.calls) {
+                const calls = callsData.calls;
+                updateOutcomesChart(calls);
+                updateSentimentChart(calls);
+                updateCallsOverTimeChart(calls);
+                calculateMargins(calls);
+            }
+            
+            // Fetch top lanes
+            const lanes = await fetchData('/metrics/lanes');
+            updateTopLanes(lanes);
+            
+            // Fetch loads metrics for equipment breakdown
+            const loadsMetrics = await fetchData('/metrics/loads');
+            if (loadsMetrics && loadsMetrics.equipment_breakdown) {
+                updateEquipmentChart(loadsMetrics.equipment_breakdown);
+            }
+
+            document.getElementById('last-updated').textContent = new Date().toLocaleString();
+            document.getElementById('refresh-icon').textContent = '🔄';
+        }
+        
+        function updateTopLanes(lanes) {
+            const container = document.getElementById('top-lanes');
+            if (!lanes || lanes.length === 0) {
+                container.innerHTML = '<p class="text-gray-500">No booked lanes yet</p>';
+                return;
+            }
+            
+            container.innerHTML = lanes.slice(0, 5).map((lane, i) => `
+                <div class="flex justify-between items-center p-3 bg-gray-700/50 rounded-lg">
+                    <div>
+                        <span class="font-medium text-white">${i + 1}. ${lane.origin}</span>
+                        <span class="text-gray-500 mx-2">→</span>
+                        <span class="font-medium text-white">${lane.destination}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-green-400 font-medium">$${Math.round(lane.avg_rate).toLocaleString()}</span>
+                        <span class="text-gray-500 text-sm ml-2">(${lane.count})</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function updateEquipmentChart(equipment) {
+            const ctx = document.getElementById('equipment-chart');
+            if (!ctx) return;
+            
+            const labels = Object.keys(equipment);
+            const data = Object.values(equipment);
+            
+            if (window.equipmentChart) window.equipmentChart.destroy();
+            
+            window.equipmentChart = new Chart(ctx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function updateOutcomesChart(calls) {
+            const outcomes = {};
+            calls.forEach(c => {
+                if (c.outcome) {
+                    const label = c.outcome.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    outcomes[label] = (outcomes[label] || 0) + 1;
+                }
+            });
+
+            const ctx = document.getElementById('outcomes-chart').getContext('2d');
+            if (outcomesChart) outcomesChart.destroy();
+            
+            outcomesChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(outcomes),
+                    datasets: [{
+                        data: Object.values(outcomes),
+                        backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function updateSentimentChart(calls) {
+            const sentiment = { positive: 0, neutral: 0, negative: 0 };
+            calls.forEach(c => {
+                if (c.sentiment && sentiment.hasOwnProperty(c.sentiment)) {
+                    sentiment[c.sentiment]++;
+                }
+            });
+
+            const ctx = document.getElementById('sentiment-chart').getContext('2d');
+            if (sentimentChart) sentimentChart.destroy();
+            
+            sentimentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Positive', 'Neutral', 'Negative'],
+                    datasets: [{
+                        data: [sentiment.positive, sentiment.neutral, sentiment.negative],
+                        backgroundColor: ['#10B981', '#F59E0B', '#EF4444']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function updateCallsOverTimeChart(calls) {
+            const byDate = {};
+            const revenueByDate = {};
+            
+            calls.forEach(c => {
+                const date = c.call_start_time?.split('T')[0] || c.created_at?.split('T')[0];
+                if (date) {
+                    byDate[date] = (byDate[date] || 0) + 1;
+                    if (c.agreed_rate) {
+                        revenueByDate[date] = (revenueByDate[date] || 0) + parseFloat(c.agreed_rate);
+                    }
+                }
+            });
+
+            const sortedDates = Object.keys(byDate).sort();
+            
+            // Calls chart
+            const ctx = document.getElementById('calls-time-chart').getContext('2d');
+            if (callsTimeChart) callsTimeChart.destroy();
+            
+            callsTimeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: 'Calls',
+                        data: sortedDates.map(d => byDate[d]),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+            
+            // Revenue chart
+            const ctxRev = document.getElementById('revenue-time-chart').getContext('2d');
+            if (revenueTimeChart) revenueTimeChart.destroy();
+            
+            revenueTimeChart = new Chart(ctxRev, {
+                type: 'bar',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: 'Revenue',
+                        data: sortedDates.map(d => revenueByDate[d] || 0),
+                        backgroundColor: '#10B981',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { 
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        } 
+                    }
+                }
+            });
+        }
+
+        async function calculateMargins(calls) {
+            let totalAgreed = 0, totalLoadboard = 0, dealsCount = 0;
+            
+            for (const call of calls) {
+                if (call.agreed_rate && call.load_id) {
+                    const load = await fetchData('/loads/' + call.load_id);
+                    if (load && load.loadboard_rate) {
+                        totalAgreed += parseFloat(call.agreed_rate);
+                        totalLoadboard += parseFloat(load.loadboard_rate);
+                        dealsCount++;
+                    }
+                }
+            }
+
+            document.getElementById('deals-analyzed').textContent = dealsCount;
+            
+            if (dealsCount > 0) {
+                const avgDealSize = totalAgreed / dealsCount;
+                document.getElementById('avg-deal-size').textContent = '$' + Math.round(avgDealSize).toLocaleString();
+            }
+
+            if (dealsCount > 0 && totalLoadboard > 0) {
+                const pctDiff = ((totalAgreed / totalLoadboard - 1) * 100).toFixed(1);
+                const marginDiff = totalAgreed - totalLoadboard;
+                
+                const marginEl = document.getElementById('avg-discount');
+                const impactEl = document.getElementById('margin-impact');
+                const labelEl = document.getElementById('margin-label');
+                
+                if (pctDiff >= 0) {
+                    // Premium - carriers paying MORE than loadboard (good!)
+                    marginEl.textContent = '+' + pctDiff + '%';
+                    marginEl.className = 'text-2xl font-bold text-green-400';
+                    impactEl.textContent = '+$' + Math.round(marginDiff).toLocaleString();
+                    impactEl.className = 'text-2xl font-bold text-green-400';
+                    labelEl.textContent = 'Premium Earned';
+                } else {
+                    // Discount - carriers paying LESS than loadboard
+                    marginEl.textContent = pctDiff + '%';
+                    marginEl.className = 'text-2xl font-bold text-red-400';
+                    impactEl.textContent = '-$' + Math.round(Math.abs(marginDiff)).toLocaleString();
+                    impactEl.className = 'text-2xl font-bold text-red-400';
+                    labelEl.textContent = 'Discount Given';
+                }
+            } else {
+                document.getElementById('avg-discount').textContent = 'N/A';
+                document.getElementById('margin-impact').textContent = '$0';
+                document.getElementById('avg-deal-size').textContent = 'N/A';
+            }
+        }
+
+        // Initial load
+        refreshData();
+        // Auto-refresh every 30 seconds
+        setInterval(refreshData, 30000);
+    </script>
+</body>
+</html>

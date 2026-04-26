@@ -1,8 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import logging
+import os
 
 from config import get_settings, Settings
 from database import init_supabase, get_supabase
@@ -54,6 +57,12 @@ app.include_router(calls.router, prefix="/calls", tags=["Calls"], dependencies=[
 app.include_router(metrics.router, prefix="/metrics", tags=["Metrics"], dependencies=[Depends(verify_api_key)])
 
 
+# Mount static files for dashboard
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "happy-robot-carrier-sales"}
@@ -61,11 +70,25 @@ async def health_check():
 
 @app.get("/")
 async def root():
+    """Serve dashboard or API info"""
+    static_index = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(static_index):
+        return FileResponse(static_index)
     return {
         "message": "Happy Robot - Inbound Carrier Sales API",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
+        "dashboard": "/static/index.html"
     }
+
+
+@app.get("/dashboard")
+async def dashboard():
+    """Serve dashboard"""
+    static_index = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(static_index):
+        return FileResponse(static_index)
+    raise HTTPException(status_code=404, detail="Dashboard not found")
 
 
 if __name__ == "__main__":

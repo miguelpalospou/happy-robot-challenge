@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 
@@ -48,6 +48,10 @@ class LoadSearchRequest(BaseModel):
     pickup_date_to: Optional[datetime] = None
     min_rate: Optional[float] = None
     max_rate: Optional[float] = None
+    max_miles: Optional[float] = None
+    min_miles: Optional[float] = None
+    max_weight: Optional[float] = None
+    commodity_type: Optional[str] = None
     limit: int = Field(default=10, ge=1, le=50)
 
 
@@ -67,6 +71,9 @@ class Load(BaseModel):
     miles: Optional[float] = None
     dimensions: Optional[str] = None
     status: str
+    assigned_mc_number: Optional[str] = None
+    assigned_carrier_name: Optional[str] = None
+    booked_at: Optional[datetime] = None
 
 
 class LoadSearchResponse(BaseModel):
@@ -120,7 +127,16 @@ class CallLogRequest(BaseModel):
     call_id: str
     mc_number: Optional[str] = None
     phone_number: Optional[str] = None
-    carrier_id: Optional[str] = None
+    carrier_name: Optional[str] = None
+
+
+class AgreementRequest(BaseModel):
+    load_id: str
+    agreed_rate: Union[str, float, int]  # Accept string, float, or int
+    mc_number: Optional[str] = None
+    carrier_name: Optional[str] = None
+    dot_number: Optional[str] = None
+    operating_status: Optional[str] = None
 
 
 class CallUpdateRequest(BaseModel):
@@ -140,6 +156,7 @@ class CallClassifyRequest(BaseModel):
     sentiment: Sentiment
     sentiment_score: Optional[float] = Field(None, ge=-1.0, le=1.0)
     summary: Optional[str] = None
+    transcript: Optional[str] = None
     extracted_data: Optional[Dict[str, Any]] = None
 
 

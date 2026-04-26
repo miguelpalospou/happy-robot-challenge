@@ -30,13 +30,22 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
     - Round 2: Accept if within 10% of loadboard rate
     - Round 3: Accept if within 15% of loadboard rate (final offer)
     """
+    logger.info(f"Negotiation request: load_id={request.load_id}, carrier_offer={request.carrier_offer}, round={request.round_number}")
     try:
         supabase = get_supabase()
         
+        # Try to find load by human-readable load_id first, then by UUID
         load_result = supabase.table("loads")\
             .select("*")\
-            .or_(f"id.eq.{request.load_id},load_id.eq.{request.load_id}")\
+            .eq("load_id", request.load_id)\
             .execute()
+        
+        if not load_result.data:
+            # Try by UUID if not found by load_id
+            load_result = supabase.table("loads")\
+                .select("*")\
+                .eq("id", request.load_id)\
+                .execute()
         
         if not load_result.data:
             raise HTTPException(status_code=404, detail="Load not found")
