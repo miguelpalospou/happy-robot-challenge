@@ -157,7 +157,7 @@ flowchart LR
 
 | Strategy | markup | round1_flexibility | round2_flexibility | round3_flexibility | Use Case |
 |---|---|---|---|---|---|
-| **Current** | 0.05 | 0.05 | 0.07 | 0.08 | Balanced — margin + bookings |
+| **Current** | 0.15 | 0.05 | 0.07 | 0.08 | Balanced — margin + bookings |
 | Aggressive | 0.10 | 0.05 | 0.10 | 0.15 | Maximize margin |
 | Max Bookings | 0.05 | 0.10 | 0.12 | 0.15 | Fill loads fast |
 
@@ -176,7 +176,7 @@ The `evaluate_offer` endpoint accepts all 4 variables from HappyRobot:
   "load_id": "LD-2026-0123",
   "carrier_offer": 3000,
   "round_number": 1,
-  "markup_percentage": 0.05,
+  "markup_percentage": 0.15,
   "round1_flexibility": 0.05,
   "round2_flexibility": 0.07,
   "round3_flexibility": 0.08
@@ -468,7 +468,7 @@ flowchart TD
 
 | Variable | Value | Description |
 |---|---|---|
-| `markup_percentage` | `0.05` | Quote carrier 5% above loadboard rate |
+| `markup_percentage` | `0.15` | Quote carrier 15% above loadboard rate |
 | `round1_flexibility` | `0.05` | Accept if offer ≥ 95% of quoted price |
 | `round2_flexibility` | `0.07` | Accept if offer ≥ 93% of quoted price |
 | `round3_flexibility` | `0.08` | Accept if offer ≥ 92% of quoted price (final) |
@@ -476,14 +476,14 @@ flowchart TD
 ### Example: Load rate $3,500 with current settings
 
 ```
-quoted_price = $3,500 × 1.05 = $3,675  ← agent quotes this to carrier
+quoted_price = $3,500 × 1.15 = $4,025  ← agent quotes this to carrier
 
-Round 1 floor = max($3,675 × 0.95, $3,500) = max($3,491.25, $3,500) = $3,500
-Round 2 floor = max($3,675 × 0.93, $3,500) = max($3,417.75, $3,500) = $3,500
-Round 3 floor = max($3,675 × 0.92, $3,500) = max($3,381.00, $3,500) = $3,500
+Round 1 floor = max($4,025 × 0.95, $3,500) = max($3,823.75, $3,500) = $3,823.75
+Round 2 floor = max($4,025 × 0.93, $3,500) = max($3,743.25, $3,500) = $3,743.25
+Round 3 floor = max($4,025 × 0.92, $3,500) = max($3,703.00, $3,500) = $3,703.00
 ```
 
-With a 5% markup and tight flexibility, the loadboard rate is the effective floor across all rounds. Best case: carrier accepts at $3,675 (5% margin). Worst case: deal closes at $3,500 (break even).
+With a 15% markup and tight flexibility, the agent has real margin room. Best case: carrier accepts at $4,025 (15% margin). Worst case: deal closes at $3,703 (~5.8% margin). Loadboard rate is protected in all scenarios.
 
 ## Database Schema
 
