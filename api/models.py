@@ -103,7 +103,7 @@ class CarrierVerifyResponse(BaseModel):
 # Negotiation Models
 class NegotiationEvaluateRequest(BaseModel):
     load_id: str
-    carrier_offer: float = Field(..., gt=0, description="Carrier's offered rate")
+    carrier_offer: Optional[float] = Field(None, gt=0, description="Carrier's offered rate (omit to just fetch thresholds)")
     round_number: int = Field(..., ge=1, le=3, description="Current negotiation round (1-3)")
     call_id: Optional[str] = None
     # Configurable thresholds (can be set from HappyRobot workflow variables)
@@ -125,9 +125,9 @@ class NegotiationEvaluateResponse(BaseModel):
     message: str
     round_number: int
     can_continue: bool = Field(description="Whether more negotiation rounds are available")
-    round1_min: Optional[float] = None
-    round2_min: Optional[float] = None
-    round3_min: Optional[float] = None
+    round1_max: Optional[float] = None
+    round2_max: Optional[float] = None
+    round3_max: Optional[float] = None
 
 
 class NegotiationCreateRequest(BaseModel):

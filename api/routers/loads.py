@@ -132,7 +132,7 @@ async def search_loads(request: LoadSearchRequest):
         loads = []
         for load_data in result.data:
             load = Load(**load_data)
-            load.quoted_price = round(load.loadboard_rate * (1 + markup), 2)
+            load.quoted_price = round(load.loadboard_rate * (1 - markup), 2)
             loads.append(load)
 
         return LoadSearchResponse(loads=loads, count=len(loads))

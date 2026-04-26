@@ -13,27 +13,25 @@ logger = logging.getLogger(__name__)
 
 MAX_NEGOTIATION_ROUNDS = 3
 
-DEFAULT_MARKUP = 0.0  # No markup by default (quoted = loadboard rate)
-
-# Default flexibility values (can be overridden via HappyRobot workflow variables)
-DEFAULT_FLEXIBILITY = {
-    1: 0.05,  # 5% off quoted price in round 1
-    2: 0.10,  # 10% off quoted price in round 2
-    3: 0.15,  # 15% off quoted price in round 3 (final offer)
-}
-
 
 def get_flexibility(request, round_num: int) -> float:
-    """Get flexibility for a round. Accepts both round1_flexibility and round1_discount naming."""
+    """Get flexibility for a round. Accepts both round1_flexibility and round1_discount naming.
+    Values must be provided via HappyRobot workflow variables — no defaults."""
+    def first_set(*vals):
+        for v in vals:
+            if v is not None:
+                return v
+        return None
+
     flexibility_vals = {
-        1: request.round1_flexibility or request.round1_discount,
-        2: request.round2_flexibility or request.round2_discount,
-        3: request.round3_flexibility or request.round3_discount,
+        1: first_set(request.round1_flexibility, request.round1_discount),
+        2: first_set(request.round2_flexibility, request.round2_discount),
+        3: first_set(request.round3_flexibility, request.round3_discount),
     }
     override = flexibility_vals.get(round_num)
-    if override is not None:
-        return override
-    return DEFAULT_FLEXIBILITY.get(round_num, 0.15)
+    if override is None:
+        raise HTTPException(status_code=400, detail=f"round{round_num}_flexibility is required")
+    return override
 
 
 @router.post("/evaluate", response_model=NegotiationEvaluateResponse)
@@ -41,81 +39,92 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
     """
     Evaluate a carrier's counter offer and determine if it's acceptable.
     Returns whether to accept, reject, or make a counter-counter offer.
-    
+
     Negotiation logic:
-    - Round 1: Accept if within 5% of loadboard rate
-    - Round 2: Accept if within 10% of loadboard rate
-    - Round 3: Accept if within 15% of loadboard rate (final offer)
+    - Broker quotes loadboard_rate to carrier as initial offer
+    - Carrier counters HIGHER (wants more money)
+    - Broker has a ceiling per round (goes up each round as broker gets more flexible)
+    - Round 1: accept if carrier asks <= loadboard * 1.05
+    - Round 2: accept if carrier asks <= loadboard * 1.07
+    - Round 3: accept if carrier asks <= loadboard * 1.08 (final ceiling)
     """
     logger.info(f"Negotiation request: load_id={request.load_id}, carrier_offer={request.carrier_offer}, round={request.round_number}")
     try:
         supabase = get_supabase()
-        
-        # Try to find load by human-readable load_id first, then by UUID
+
         load_result = supabase.table("loads")\
             .select("*")\
             .eq("load_id", request.load_id)\
             .execute()
-        
+
         if not load_result.data:
-            # Try by UUID if not found by load_id
             load_result = supabase.table("loads")\
                 .select("*")\
                 .eq("id", request.load_id)\
                 .execute()
-        
+
         if not load_result.data:
             raise HTTPException(status_code=404, detail="Load not found")
-        
+
         load = load_result.data[0]
         loadboard_rate = float(load["loadboard_rate"])
 
-        # Calculate quoted price (what agent presents to carrier)
-        markup = request.markup_percentage if request.markup_percentage is not None else DEFAULT_MARKUP
-        quoted_price = round(loadboard_rate * (1 + markup), 2)
+        # quoted_price = opening offer to carrier (below loadboard by markup_percentage)
+        # markup_percentage comes from HappyRobot workflow variable
+        markup = request.markup_percentage if request.markup_percentage is not None else 0.0
+        quoted_price = round(loadboard_rate * (1 - markup), 2)
 
         round_num = min(request.round_number, MAX_NEGOTIATION_ROUNDS)
         flexibility = get_flexibility(request, round_num)
 
-        logger.info(f"Round {round_num}: loadboard=${loadboard_rate}, quoted=${quoted_price}, flexibility={flexibility*100}%")
+        # Ceiling per round = loadboard * (1 - flexibility), goes UP each round
+        # Round 1: strictest (highest discount off loadboard)
+        # Round 3: loadboard rate itself = absolute ceiling
+        max_acceptable = round(loadboard_rate * (1 - flexibility), 2)
 
-        # Floor is the higher of (quoted * discount) and loadboard_rate — never go below cost
-        discount_floor = quoted_price * (1 - flexibility)
-        min_acceptable = round(max(discount_floor, loadboard_rate), 2)
+        logger.info(f"Round {round_num}: loadboard=${loadboard_rate}, quoted=${quoted_price}, max_acceptable=${max_acceptable}, carrier_offer=${request.carrier_offer}")
 
-        is_acceptable = request.carrier_offer >= min_acceptable
-
-        if is_acceptable:
-            message = f"Great! We can accept ${request.carrier_offer:.2f} for this load."
+        # If no carrier_offer, just return thresholds (used for upfront memory loading)
+        if request.carrier_offer is None:
+            is_acceptable = False
             suggested_counter = None
+            can_continue = True
+            message = f"Thresholds loaded. Opening offer: ${quoted_price:.2f}."
         else:
-            suggested_counter = round((request.carrier_offer + min_acceptable) / 2, 2)
+            # Accept if carrier's ask is at or below the ceiling for this round
+            is_acceptable = request.carrier_offer <= max_acceptable
 
-            if round_num < MAX_NEGOTIATION_ROUNDS:
-                message = (
-                    f"I appreciate the offer of ${request.carrier_offer:.2f}, but our minimum "
-                    f"for this lane is ${min_acceptable:.2f}. How about we meet at ${suggested_counter:.2f}?"
-                )
+            if is_acceptable:
+                message = f"Great! We can do ${request.carrier_offer:.2f} for this load."
+                suggested_counter = None
             else:
-                message = (
-                    f"This is our final offer. The best we can do is ${min_acceptable:.2f}. "
-                    f"The load is {load['miles']} miles from {load['origin']} to {load['destination']}."
-                )
-        
-        can_continue = round_num < MAX_NEGOTIATION_ROUNDS and not is_acceptable
+                suggested_counter = max_acceptable
 
-        # Pre-calculate all round thresholds so HappyRobot can store them in memory
-        def calc_min(r):
+                if round_num < MAX_NEGOTIATION_ROUNDS:
+                    message = (
+                        f"${request.carrier_offer:.2f} is a bit high for this lane. "
+                        f"Best we can do right now is ${max_acceptable:.2f}. Does that work?"
+                    )
+                else:
+                    message = (
+                        f"That's our final offer — the most we can pay is ${max_acceptable:.2f} "
+                        f"for the {load['miles']} miles from {load['origin']} to {load['destination']}."
+                    )
+
+            can_continue = round_num < MAX_NEGOTIATION_ROUNDS and not is_acceptable
+
+        # Pre-calculate all round ceilings so HappyRobot can store them on round 1
+        def calc_max(r):
             f = get_flexibility(request, r)
-            return round(max(quoted_price * (1 - f), loadboard_rate), 2)
+            return round(loadboard_rate * (1 - f), 2)
 
-        all_round_mins = {
-            "round1_min": calc_min(1),
-            "round2_min": calc_min(2),
-            "round3_min": calc_min(3),
+        all_round_maxes = {
+            "round1_max": calc_max(1),
+            "round2_max": calc_max(2),
+            "round3_max": calc_max(3),
         }
 
-        if request.call_id:
+        if request.call_id and request.carrier_offer is not None:
             negotiation_record = {
                 "call_id": request.call_id,
                 "load_id": load["id"],
@@ -126,18 +135,18 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
                 "final_rate": request.carrier_offer if is_acceptable else None,
                 "status": "accepted" if is_acceptable else "counter_offered"
             }
-            
+
             supabase.table("negotiations").insert(negotiation_record).execute()
-        
+
         return NegotiationEvaluateResponse(
             is_acceptable=is_acceptable,
             quoted_price=quoted_price,
-            min_acceptable_rate=min_acceptable,
+            min_acceptable_rate=max_acceptable,
             suggested_counter=suggested_counter,
             message=message,
             round_number=round_num,
             can_continue=can_continue,
-            **all_round_mins
+            **all_round_maxes
         )
         
     except HTTPException:

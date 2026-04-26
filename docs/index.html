@@ -392,15 +392,15 @@
         <div class="max-w-6xl mx-auto">
             <h2 class="text-3xl font-bold text-center mb-4">Smart Negotiation Strategy</h2>
             <p class="text-gray-600 text-center max-w-2xl mx-auto mb-12">
-                The agent quotes carriers a marked-up price, then negotiates down — with the internal loadboard rate as a hard floor. You never agree to a loss.
+                The agent quotes carriers a low opening price (below loadboard), then negotiates up. The loadboard rate is the hard ceiling — the broker never pays above cost.
             </p>
 
             <!-- How it works -->
             <div class="bg-gray-900 rounded-2xl p-6 text-white mb-8 font-mono text-sm">
                 <p class="text-gray-400 mb-2">// Pricing formula</p>
-                <p><span class="text-purple-400">quoted_price</span> = loadboard_rate × (1 + <span class="text-yellow-400">markup_percentage</span>)</p>
-                <p><span class="text-green-400">min_acceptable</span> = max(quoted_price × (1 − round_flexibility), <span class="text-red-400">loadboard_rate</span>)</p>
-                <p class="text-gray-500 mt-3">// loadboard_rate is the hard floor — never crossed</p>
+                <p><span class="text-purple-400">quoted_price</span> = loadboard_rate × (1 − <span class="text-yellow-400">markup_percentage</span>)  <span class="text-gray-500">// low opening offer</span></p>
+                <p><span class="text-green-400">max_acceptable</span> = loadboard_rate × (1 − <span class="text-blue-400">round_flexibility</span>)  <span class="text-gray-500">// ceiling rises each round</span></p>
+                <p><span class="text-red-400">loadboard_rate</span> = absolute ceiling — broker never pays above this</p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-6">
@@ -408,10 +408,10 @@
                     <h3 class="font-semibold text-lg mb-4">Current Settings</h3>
                     <p class="text-gray-600 text-sm mb-4">Configured in HappyRobot workflow</p>
                     <div class="bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-300">
-                        <pre>markup_percentage  = 0.15  # 15%
-round1_flexibility = 0.05  # 5%
-round2_flexibility = 0.07  # 7%
-round3_flexibility = 0.08  # 8%</pre>
+                        <pre>markup_percentage  = 0.15  # quote 15% below loadboard
+round1_flexibility = 0.08  # ceiling: loadboard − 8%
+round2_flexibility = 0.05  # ceiling: loadboard − 5%
+round3_flexibility = 0.00  # ceiling: loadboard (max)</pre>
                     </div>
                 </div>
 
@@ -432,46 +432,46 @@ round3_flexibility = 0.08  # 8%</pre>
                             </tr>
                             <tr class="border-b border-gray-100">
                                 <td class="py-2 text-blue-600">round1_flexibility</td>
-                                <td class="py-2">0.05</td>
+                                <td class="py-2">0.08</td>
                             </tr>
                             <tr class="border-b border-gray-100">
                                 <td class="py-2 text-blue-600">round2_flexibility</td>
-                                <td class="py-2">0.07</td>
+                                <td class="py-2">0.05</td>
                             </tr>
                             <tr>
                                 <td class="py-2 text-blue-600">round3_flexibility</td>
-                                <td class="py-2">0.08</td>
+                                <td class="py-2">0.00</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="bg-white rounded-2xl p-6 border border-gray-200">
-                    <h3 class="font-semibold text-lg mb-4">Example: $3,500 Load</h3>
-                    <p class="text-xs text-gray-500 mb-3">Quoted to carrier: <span class="font-semibold text-gray-800">$4,025</span> (+15%)</p>
+                    <h3 class="font-semibold text-lg mb-4">Example: $3,000 Load</h3>
+                    <p class="text-xs text-gray-500 mb-3">Agent opens at: <span class="font-semibold text-gray-800">$2,550</span> (−15%)</p>
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b border-gray-200">
                                 <th class="text-left py-2 text-gray-500">Round</th>
-                                <th class="text-left py-2 text-gray-500">Floor</th>
+                                <th class="text-left py-2 text-gray-500">Ceiling</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr class="border-b border-gray-100">
-                                <td class="py-2">Round 1 (5% off)</td>
-                                <td class="py-2 text-green-600 font-medium">$3,824</td>
+                                <td class="py-2">Round 1 (−8%)</td>
+                                <td class="py-2 text-green-600 font-medium">$2,760</td>
                             </tr>
                             <tr class="border-b border-gray-100">
-                                <td class="py-2">Round 2 (7% off)</td>
-                                <td class="py-2 text-yellow-600 font-medium">$3,743</td>
+                                <td class="py-2">Round 2 (−5%)</td>
+                                <td class="py-2 text-yellow-600 font-medium">$2,850</td>
                             </tr>
                             <tr>
-                                <td class="py-2">Round 3 (8% off)</td>
-                                <td class="py-2 text-orange-600 font-medium">$3,703</td>
+                                <td class="py-2">Round 3 (0%)</td>
+                                <td class="py-2 text-orange-600 font-medium">$3,000</td>
                             </tr>
                         </tbody>
                     </table>
-                    <p class="text-xs text-red-500 mt-3">Hard floor: $3,500 (loadboard rate)</p>
+                    <p class="text-xs text-red-500 mt-3">Hard ceiling: $3,000 (loadboard rate)</p>
                 </div>
             </div>
 
@@ -480,8 +480,8 @@ round3_flexibility = 0.08  # 8%</pre>
                 <ol class="text-sm text-blue-800 space-y-2">
                     <li>1. Go to <strong>Workflow Settings → Variables</strong></li>
                     <li>2. Create: <code class="bg-blue-100 px-1 rounded">markup_percentage</code>, <code class="bg-blue-100 px-1 rounded">round1_flexibility</code>, <code class="bg-blue-100 px-1 rounded">round2_flexibility</code>, <code class="bg-blue-100 px-1 rounded">round3_flexibility</code></li>
-                    <li>3. In the <strong>evaluate_offer tool</strong>, map these as body parameters</li>
-                    <li>4. The API enforces the loadboard floor automatically — no risk of agreeing below cost</li>
+                    <li>3. In the <strong>search_loads</strong> and <strong>evaluate_offer</strong> tools, map these as body parameters</li>
+                    <li>4. The API enforces the loadboard ceiling automatically — broker never pays above cost</li>
                 </ol>
             </div>
 

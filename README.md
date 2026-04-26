@@ -122,27 +122,43 @@ Since negotiation thresholds are configurable via **HappyRobot workflow variable
 
 ### How It Works
 
+**Negotiation logic:**
+- `quoted_price = loadboard_rate × (1 − markup_percentage)` — agent opens low
+- Each round, the ceiling rises toward the loadboard rate
+- `max_acceptable = loadboard_rate × (1 − round_flexibility)` — goes up each round
+- Carrier counters higher, broker stretches up to the loadboard ceiling
+- Loadboard rate = absolute ceiling, broker never pays above cost
+
+**Example with loadboard $3,000, markup 15%:**
+
+| | Amount |
+|---|---|
+| Agent opens at | $2,550 (−15%) |
+| Round 1 ceiling (−8%) | $2,760 |
+| Round 2 ceiling (−5%) | $2,850 |
+| Round 3 ceiling (0%) | $3,000 (loadboard = max) |
+
 ```mermaid
 flowchart LR
     subgraph A["Current Strategy"]
-        A0[Markup: 5%]
-        A1[Round 1: 5% off quoted]
-        A2[Round 2: 7% off quoted]
-        A3[Round 3: 8% off quoted]
+        A0[Markup: 15% below loadboard]
+        A1[Round 1: ceiling at −8%]
+        A2[Round 2: ceiling at −5%]
+        A3[Round 3: ceiling at loadboard]
     end
 
-    subgraph B["Strategy B (Aggressive)"]
-        B0[Markup: 10%]
-        B1[Round 1: 5% off quoted]
-        B2[Round 2: 10% off quoted]
-        B3[Round 3: 15% off quoted]
+    subgraph B["Strategy B (Tight Margin)"]
+        B0[Markup: 20% below loadboard]
+        B1[Round 1: ceiling at −12%]
+        B2[Round 2: ceiling at −8%]
+        B3[Round 3: ceiling at −5%]
     end
 
-    subgraph C["Strategy C (Max Bookings)"]
-        C0[Markup: 5%]
-        C1[Round 1: 10% off quoted]
-        C2[Round 2: 12% off quoted]
-        C3[Round 3: 15% off quoted]
+    subgraph C["Strategy C (Fill Fast)"]
+        C0[Markup: 8% below loadboard]
+        C1[Round 1: ceiling at −4%]
+        C2[Round 2: ceiling at −2%]
+        C3[Round 3: ceiling at loadboard]
     end
 
     A --> M[Measure: Conversion Rate, Avg Margin]
@@ -155,11 +171,11 @@ flowchart LR
 1. **Create multiple workflow versions** (or use environments: staging/production)
 2. **Set different variable values** for each version:
 
-| Strategy | markup | round1_flexibility | round2_flexibility | round3_flexibility | Use Case |
+| Strategy | markup_percentage | round1_flexibility | round2_flexibility | round3_flexibility | Use Case |
 |---|---|---|---|---|---|
-| **Current** | 0.15 | 0.05 | 0.07 | 0.08 | Balanced — margin + bookings |
-| Aggressive | 0.10 | 0.05 | 0.10 | 0.15 | Maximize margin |
-| Max Bookings | 0.05 | 0.10 | 0.12 | 0.15 | Fill loads fast |
+| **Current** | 0.15 | 0.08 | 0.05 | 0.00 | Balanced — margin + bookings |
+| Tight Margin | 0.20 | 0.12 | 0.08 | 0.05 | Maximize margin, fewer bookings |
+| Fill Fast | 0.08 | 0.04 | 0.02 | 0.00 | Fill loads fast, lower margin |
 
 3. **Route traffic** between versions
 4. **Compare metrics** in the dashboard:
@@ -169,7 +185,7 @@ flowchart LR
 
 ### API Parameters
 
-The `search_loads` endpoint now accepts `markup_percentage` and returns `quoted_price` per load:
+The `search_loads` endpoint accepts `markup_percentage` and returns `quoted_price` — the agent's opening offer to the carrier (below loadboard):
 
 ```json
 {
@@ -183,44 +199,42 @@ Response includes:
 ```json
 {
   "load_id": "LD-2026-0973",
-  "loadboard_rate": 7100.68,
-  "quoted_price": 8165.78
+  "loadboard_rate": 3000.00,
+  "quoted_price": 2550.00
 }
 ```
 
-The `evaluate_offer` endpoint accepts both naming conventions from HappyRobot:
+The `evaluate_offer` endpoint accepts both `round1_flexibility` and `round1_discount` naming:
 
 ```json
 {
   "load_id": "LD-2026-0123",
-  "carrier_offer": 3000,
+  "carrier_offer": 2800,
   "round_number": 1,
   "markup_percentage": 0.15,
-  "round1_discount": 0.05,
-  "round2_discount": 0.07,
-  "round3_discount": 0.08
+  "round1_flexibility": 0.08,
+  "round2_flexibility": 0.05,
+  "round3_flexibility": 0.00
 }
 ```
 
-`round1_flexibility` / `round1_discount` are both accepted — use whichever matches your HappyRobot variable names. Defaults to no markup (0%) and 5%/10%/15% flexibility if not provided.
-
-The response now includes **all 3 round thresholds** on every call, so HappyRobot can store them as workflow variables on round 1 and skip re-querying on rounds 2 and 3:
+The response includes **all 3 round ceilings** so HappyRobot can store them on round 1 and skip re-querying on rounds 2 and 3:
 
 ```json
 {
-  "is_acceptable": false,
-  "quoted_price": 3456.81,
-  "min_acceptable_rate": 3283.97,
-  "suggested_counter": 3141.99,
+  "is_acceptable": true,
+  "quoted_price": 2550.00,
+  "min_acceptable_rate": 2760.00,
+  "suggested_counter": null,
   "round_number": 1,
-  "can_continue": true,
-  "round1_min": 3283.97,
-  "round2_min": 3214.83,
-  "round3_min": 3180.26
+  "can_continue": false,
+  "round1_max": 2760.00,
+  "round2_max": 2850.00,
+  "round3_max": 3000.00
 }
 ```
 
-**Recommended HappyRobot setup:** On round 1, map `round1_min`, `round2_min`, `round3_min` to workflow variables. For rounds 2–3, the agent can compare the carrier's offer against those stored values without an extra API call.
+**Recommended HappyRobot setup:** On round 1, map `round1_max`, `round2_max`, `round3_max` to workflow variables. Rounds 2–3 compare the carrier's offer against those stored values directly — no extra API call needed.
 
 ## Data Flow
 
@@ -768,6 +782,68 @@ uvicorn main:app --reload --port 8000
 | http://localhost:8000/docs | API Documentation (Swagger) |
 | http://localhost:8000/redoc | API Documentation (ReDoc) |
 | http://localhost:8000/health | Health Check |
+
+## Security
+
+### HTTPS / TLS
+
+| Environment | Implementation |
+|-------------|----------------|
+| **Production** | Railway provides automatic SSL/TLS via Let's Encrypt |
+| **Local** | HTTP (self-signed acceptable per requirements) |
+
+Production URL: `https://happyrobot-production-03c4.up.railway.app`
+
+### API Key Authentication
+
+All API endpoints require authentication via the `X-API-Key` header.
+
+```python
+# main.py - Security middleware
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+async def verify_api_key(api_key: str = Security(api_key_header)):
+    if not api_key or api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return api_key
+
+# Applied to all routers
+app.include_router(loads.router, dependencies=[Depends(verify_api_key)])
+app.include_router(carriers.router, dependencies=[Depends(verify_api_key)])
+app.include_router(negotiations.router, dependencies=[Depends(verify_api_key)])
+app.include_router(calls.router, dependencies=[Depends(verify_api_key)])
+app.include_router(metrics.router, dependencies=[Depends(verify_api_key)])
+```
+
+**Usage:**
+
+```bash
+# All API calls require the X-API-Key header
+curl -H "X-API-Key: your-api-key" https://happyrobot-production-03c4.up.railway.app/loads
+
+# Unauthorized requests return 401
+curl https://happyrobot-production-03c4.up.railway.app/loads
+# {"detail": "Invalid or missing API key"}
+```
+
+**Configuration:**
+
+Set the API key in your `.env` file:
+
+```
+API_KEY=your-secure-api-key-here
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_URL` | Yes | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Yes | Supabase service role key (not anon key) |
+| `API_KEY` | Yes | API authentication key for webhooks |
+| `FMCSA_WEBKEY` | No | FMCSA API key (falls back to HTML scraping if not set) |
+| `DEBUG` | No | Enable debug mode (default: false) |
+| `LOG_LEVEL` | No | Logging level (default: INFO) |
 
 ## Tech Stack
 
