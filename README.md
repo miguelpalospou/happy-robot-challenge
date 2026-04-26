@@ -742,7 +742,8 @@ Example:
 | **API Docs (Swagger)** | https://happyrobot-production-03c4.up.railway.app/docs |
 | **API Docs (ReDoc)** | https://happyrobot-production-03c4.up.railway.app/redoc |
 | **Health Check** | https://happyrobot-production-03c4.up.railway.app/health |
-| **GitHub Pages** | https://miguelpalospou.github.io/happy-robot-challenge/ |
+| **Project Overview** | https://miguelpalospou.github.io/happy-robot-challenge/ |
+| **GitHub Repo** | https://github.com/miguelpalospou/happy-robot-challenge |
 
 ### Reproduce Deployment (Railway)
 
@@ -779,34 +780,18 @@ railway domain
 # Returns: https://your-app-production-xxxx.up.railway.app
 ```
 
-**Alternative: One-click Deploy**
+### Database (Supabase)
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/happy-robot)
+The database is hosted on Supabase. To access or reproduce:
 
-### Reproduce Deployment (Docker - Any Cloud)
+**Option 1: Use Existing Database (Shared Access)**
 
-For AWS, GCP, Azure, or any Docker-compatible host:
+Contact the project owner for read-only credentials or request access via Supabase Dashboard sharing.
 
-```bash
-# 1. Clone and build
-git clone https://github.com/miguelpalospou/happy-robot-challenge.git
-cd happy-robot-challenge
-docker build -t happy-robot-api .
+**Option 2: Create Your Own Supabase Project**
 
-# 2. Run with environment variables
-docker run -d \
-  -p 8000:8000 \
-  -e SUPABASE_URL="https://your-project.supabase.co" \
-  -e SUPABASE_SERVICE_KEY="your-service-key" \
-  -e API_KEY="your-secure-api-key" \
-  -e PORT=8000 \
-  happy-robot-api
-
-# 3. Verify deployment
-curl http://localhost:8000/health
-```
-
-### Database Setup (Supabase)
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Go to SQL Editor and run migrations in order:
 
 ```bash
 # Run migrations in order
