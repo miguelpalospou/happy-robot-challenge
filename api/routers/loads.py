@@ -127,9 +127,14 @@ async def search_loads(request: LoadSearchRequest):
         query = query.order("pickup_datetime").limit(request.limit)
         
         result = query.execute()
-        
-        loads = [Load(**load) for load in result.data]
-        
+
+        markup = request.markup_percentage or 0.0
+        loads = []
+        for load_data in result.data:
+            load = Load(**load_data)
+            load.quoted_price = round(load.loadboard_rate * (1 + markup), 2)
+            loads.append(load)
+
         return LoadSearchResponse(loads=loads, count=len(loads))
         
     except Exception as e:

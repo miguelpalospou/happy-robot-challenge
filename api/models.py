@@ -53,6 +53,7 @@ class LoadSearchRequest(BaseModel):
     max_weight: Optional[float] = None
     commodity_type: Optional[str] = None
     limit: int = Field(default=10, ge=1, le=50)
+    markup_percentage: Optional[float] = Field(None, ge=0, le=1, description="Markup to apply over loadboard rate for quoted price (0.15 = 15%)")
 
 
 class Load(BaseModel):
@@ -105,10 +106,14 @@ class NegotiationEvaluateRequest(BaseModel):
     round_number: int = Field(..., ge=1, le=3, description="Current negotiation round (1-3)")
     call_id: Optional[str] = None
     # Configurable thresholds (can be set from HappyRobot workflow variables)
-    markup_percentage: Optional[float] = Field(None, ge=0, le=1, description="Markup over loadboard rate to quote carrier (0.10 = 10%)")
-    round1_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 1 max discount off quoted price (0.05 = 5%)")
-    round2_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 2 max discount off quoted price (0.10 = 10%)")
-    round3_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 3 max discount off quoted price (0.15 = 15%)")
+    # Accepts both naming conventions: round1_flexibility and round1_discount
+    markup_percentage: Optional[float] = Field(None, ge=0, le=1, description="Markup over loadboard rate to quote carrier (0.15 = 15%)")
+    round1_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 1 max discount off quoted price")
+    round2_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 2 max discount off quoted price")
+    round3_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 3 max discount off quoted price")
+    round1_discount: Optional[float] = Field(None, ge=0, le=1, description="Alias for round1_flexibility")
+    round2_discount: Optional[float] = Field(None, ge=0, le=1, description="Alias for round2_flexibility")
+    round3_discount: Optional[float] = Field(None, ge=0, le=1, description="Alias for round3_discount")
 
 
 class NegotiationEvaluateResponse(BaseModel):

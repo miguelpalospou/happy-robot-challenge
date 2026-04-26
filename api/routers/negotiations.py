@@ -24,13 +24,13 @@ DEFAULT_FLEXIBILITY = {
 
 
 def get_flexibility(request, round_num: int) -> float:
-    """Get flexibility for a round, using request params if provided, else defaults."""
-    overrides = {
-        1: request.round1_flexibility,
-        2: request.round2_flexibility,
-        3: request.round3_flexibility,
+    """Get flexibility for a round. Accepts both round1_flexibility and round1_discount naming."""
+    flexibility_vals = {
+        1: request.round1_flexibility or request.round1_discount,
+        2: request.round2_flexibility or request.round2_discount,
+        3: request.round3_flexibility or request.round3_discount,
     }
-    override = overrides.get(round_num)
+    override = flexibility_vals.get(round_num)
     if override is not None:
         return override
     return DEFAULT_FLEXIBILITY.get(round_num, 0.15)
