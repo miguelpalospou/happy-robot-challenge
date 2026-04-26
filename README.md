@@ -734,20 +734,90 @@ Example:
 
 ## Deployment
 
-### Railway (Current)
+### Live Deployment (Access Now)
+
+| Resource | URL |
+|----------|-----|
+| **Dashboard** | https://happyrobot-production-03c4.up.railway.app |
+| **API Docs (Swagger)** | https://happyrobot-production-03c4.up.railway.app/docs |
+| **API Docs (ReDoc)** | https://happyrobot-production-03c4.up.railway.app/redoc |
+| **Health Check** | https://happyrobot-production-03c4.up.railway.app/health |
+| **GitHub Pages** | https://miguelpalospou.github.io/happy-robot-challenge/ |
+
+### Reproduce Deployment (Railway)
+
+**Prerequisites:**
+- [Railway CLI](https://docs.railway.app/develop/cli) installed
+- Railway account (free tier available)
+- Supabase project with schema deployed
+
+**Step-by-step:**
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/miguelpalospou/happy-robot-challenge.git
+cd happy-robot-challenge
+
+# 2. Login to Railway
 railway login
+
+# 3. Create a new project (or link to existing)
+railway init
+# Select "Empty Project" when prompted
+
+# 4. Set environment variables
+railway variables set SUPABASE_URL="https://your-project.supabase.co"
+railway variables set SUPABASE_SERVICE_KEY="your-service-key"
+railway variables set API_KEY="your-secure-api-key"
+railway variables set FMCSA_WEBKEY="your-fmcsa-key"  # Optional
+
+# 5. Deploy
 railway up
-railway domain  # Get public URL
+
+# 6. Generate public domain
+railway domain
+# Returns: https://your-app-production-xxxx.up.railway.app
 ```
 
-### Docker
+**Alternative: One-click Deploy**
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/happy-robot)
+
+### Reproduce Deployment (Docker - Any Cloud)
+
+For AWS, GCP, Azure, or any Docker-compatible host:
 
 ```bash
+# 1. Clone and build
+git clone https://github.com/miguelpalospou/happy-robot-challenge.git
+cd happy-robot-challenge
 docker build -t happy-robot-api .
-docker run -p 8000:8000 --env-file .env happy-robot-api
+
+# 2. Run with environment variables
+docker run -d \
+  -p 8000:8000 \
+  -e SUPABASE_URL="https://your-project.supabase.co" \
+  -e SUPABASE_SERVICE_KEY="your-service-key" \
+  -e API_KEY="your-secure-api-key" \
+  -e PORT=8000 \
+  happy-robot-api
+
+# 3. Verify deployment
+curl http://localhost:8000/health
 ```
+
+### Database Setup (Supabase)
+
+```bash
+# Run migrations in order
+psql $DATABASE_URL < supabase/migrations/001_initial_schema.sql
+psql $DATABASE_URL < supabase/migrations/002_add_indexes.sql
+psql $DATABASE_URL < supabase/migrations/003_generated_loads.sql
+psql $DATABASE_URL < supabase/migrations/004_add_carrier_to_loads.sql
+psql $DATABASE_URL < supabase/migrations/005_metrics_functions.sql
+```
+
+Or via Supabase Dashboard: SQL Editor → paste each migration file.
 
 ## Local Development
 
