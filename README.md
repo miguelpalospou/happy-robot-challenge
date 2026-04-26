@@ -218,23 +218,25 @@ The `evaluate_offer` endpoint accepts both `round1_flexibility` and `round1_disc
 }
 ```
 
-The response includes **all 3 round ceilings** so HappyRobot can store them on round 1 and skip re-querying on rounds 2 and 3:
+The response includes **all 3 round ceilings, pre-rounded to the nearest $50**, so HappyRobot can store them on round 1 and skip re-querying on rounds 2 and 3:
 
 ```json
 {
-  "is_acceptable": true,
+  "is_acceptable": false,
   "quoted_price": 2550.00,
-  "min_acceptable_rate": 2760.00,
+  "min_acceptable_rate": 2750.00,
   "suggested_counter": null,
   "round_number": 1,
-  "can_continue": false,
-  "round1_max": 2760.00,
+  "can_continue": true,
+  "round1_max": 2750.00,
   "round2_max": 2850.00,
   "round3_max": 3000.00
 }
 ```
 
-**Recommended HappyRobot setup:** On round 1, map `round1_max`, `round2_max`, `round3_max` to workflow variables. Rounds 2–3 compare the carrier's offer against those stored values directly — no extra API call needed.
+All amounts (`quoted_price`, `round1_max`, `round2_max`, `round3_max`) are rounded to the nearest $50 by the API — the agent always speaks in clean numbers.
+
+**Recommended HappyRobot setup:** Call `evaluate_offer` immediately after pitching the load (no `carrier_offer` needed). Store `quoted_price`, `round1_max`, `round2_max`, `round3_max` as workflow variables. Rounds 1–3 use those stored values — no further API calls needed.
 
 ## Data Flow
 
@@ -745,9 +747,9 @@ Example:
 | **Project Overview** | https://miguelpalospou.github.io/happy-robot-challenge/ |
 | **GitHub Repo** | https://github.com/miguelpalospou/happy-robot-challenge |
 
-### Credentials for Reviewers
+### API Credentials
 
-To test the API, you'll need the following credentials (shared separately via email/secure channel):
+To test the API, you'll need the following credentials (shared separately via secure channel):
 
 | Credential | Purpose | How to Use |
 |------------|---------|------------|
