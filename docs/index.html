@@ -232,15 +232,18 @@
                         AI->>API: POST /loads/search
                         API-->>AI: Found 5 matching loads
                         
-                        AI->>C: "I have Houston to Dallas, $2,500..."
-                        C->>AI: "I need $3,000"
-                        
+                        API-->>AI: quoted_price per load (markup applied)
+                        AI->>C: "I have Houston to Dallas, quoted at $2,875"
+                        C->>AI: "I'll do it for $2,500"
+
                         AI->>API: POST /negotiations/evaluate
-                        API-->>AI: Acceptable (within 15%)
-                        
+                        API-->>AI: Rejected — suggested counter $2,706
+                        AI->>C: "Best we can do is $2,706"
+                        C->>AI: "Deal"
+
                         AI->>API: PUT /calls/{id}/agreement
                         API->>DB: Book load, update status
-                        
+
                         AI->>C: "Great! Transferring to sales..."
                 </div>
             </div>

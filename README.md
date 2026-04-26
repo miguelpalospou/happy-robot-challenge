@@ -169,7 +169,26 @@ flowchart LR
 
 ### API Parameters
 
-The `evaluate_offer` endpoint accepts all 4 variables from HappyRobot:
+The `search_loads` endpoint now accepts `markup_percentage` and returns `quoted_price` per load:
+
+```json
+{
+  "origin": "Phoenix",
+  "equipment_type": "Dry Van",
+  "markup_percentage": 0.15
+}
+```
+
+Response includes:
+```json
+{
+  "load_id": "LD-2026-0973",
+  "loadboard_rate": 7100.68,
+  "quoted_price": 8165.78
+}
+```
+
+The `evaluate_offer` endpoint accepts both naming conventions from HappyRobot:
 
 ```json
 {
@@ -177,13 +196,13 @@ The `evaluate_offer` endpoint accepts all 4 variables from HappyRobot:
   "carrier_offer": 3000,
   "round_number": 1,
   "markup_percentage": 0.15,
-  "round1_flexibility": 0.05,
-  "round2_flexibility": 0.07,
-  "round3_flexibility": 0.08
+  "round1_discount": 0.05,
+  "round2_discount": 0.07,
+  "round3_discount": 0.08
 }
 ```
 
-If not provided, defaults to no markup (0%) and 5%/10%/15% flexibility.
+`round1_flexibility` / `round1_discount` are both accepted — use whichever matches your HappyRobot variable names. Defaults to no markup (0%) and 5%/10%/15% flexibility if not provided.
 
 ## Data Flow
 
