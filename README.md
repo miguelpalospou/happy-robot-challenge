@@ -321,7 +321,7 @@ erDiagram
 **Dashboard:** `https://happyrobot-production-03c4.up.railway.app/` (same URL, serves dashboard)
 
 ### Authentication
-All endpoints require header: `X-API-Key: hr-carrier-sales-2024`
+All endpoints require header: `X-API-Key: <your-api-key>`
 
 ### Endpoints
 
