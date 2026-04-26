@@ -12,11 +12,26 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 MAX_NEGOTIATION_ROUNDS = 3
-FLEXIBILITY_BY_ROUND = {
+
+# Default flexibility values (can be overridden via HappyRobot workflow variables)
+DEFAULT_FLEXIBILITY = {
     1: 0.05,  # 5% flexibility in round 1
     2: 0.10,  # 10% flexibility in round 2
     3: 0.15,  # 15% flexibility in round 3 (final offer)
 }
+
+
+def get_flexibility(request, round_num: int) -> float:
+    """Get flexibility for a round, using request params if provided, else defaults."""
+    overrides = {
+        1: request.round1_flexibility,
+        2: request.round2_flexibility,
+        3: request.round3_flexibility,
+    }
+    override = overrides.get(round_num)
+    if override is not None:
+        return override
+    return DEFAULT_FLEXIBILITY.get(round_num, 0.15)
 
 
 @router.post("/evaluate", response_model=NegotiationEvaluateResponse)
@@ -54,7 +69,9 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         loadboard_rate = float(load["loadboard_rate"])
         
         round_num = min(request.round_number, MAX_NEGOTIATION_ROUNDS)
-        flexibility = FLEXIBILITY_BY_ROUND.get(round_num, 0.15)
+        flexibility = get_flexibility(request, round_num)
+        
+        logger.info(f"Round {round_num}: using {flexibility*100}% flexibility (override={getattr(request, f'round{round_num}_flexibility', None)})")
         
         min_acceptable = loadboard_rate * (1 - flexibility)
         

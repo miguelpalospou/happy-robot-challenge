@@ -392,48 +392,81 @@
                 Configurable price flexibility with progressive discount limits.
             </p>
             
-            <div class="grid md:grid-cols-2 gap-8">
-                <div class="bg-white rounded-2xl p-8 border border-gray-200">
-                    <h3 class="font-semibold text-lg mb-4">Configuration (Code)</h3>
-                    <p class="text-gray-600 text-sm mb-4">Located in <code class="bg-gray-100 px-2 py-1 rounded">api/routers/negotiations.py</code></p>
-                    <div class="bg-gray-900 rounded-xl p-4 text-sm font-mono text-gray-300 overflow-x-auto">
-                        <pre>NEGOTIATION_FLEXIBILITY = {
-    1: 0.05,  # Round 1: max 5% discount
-    2: 0.10,  # Round 2: max 10% discount
-    3: 0.15,  # Round 3: max 15% discount
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-2xl p-6 border border-gray-200">
+                    <h3 class="font-semibold text-lg mb-4">Default Values (Code)</h3>
+                    <p class="text-gray-600 text-sm mb-4">Fallback if not overridden</p>
+                    <div class="bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-300">
+                        <pre>DEFAULT_FLEXIBILITY = {
+  1: 0.05,  # 5%
+  2: 0.10,  # 10%
+  3: 0.15,  # 15%
 }</pre>
                     </div>
                 </div>
                 
-                <div class="bg-white rounded-2xl p-8 border border-gray-200">
+                <div class="bg-white rounded-2xl p-6 border border-gray-200">
+                    <h3 class="font-semibold text-lg mb-4">HappyRobot Variables</h3>
+                    <p class="text-gray-600 text-sm mb-4">Override via workflow variables</p>
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-2 text-gray-500">Variable</th>
+                                <th class="text-left py-2 text-gray-500">API Param</th>
+                            </tr>
+                        </thead>
+                        <tbody class="font-mono">
+                            <tr class="border-b border-gray-100">
+                                <td class="py-2">round1_discount</td>
+                                <td class="py-2 text-blue-600">round1_flexibility</td>
+                            </tr>
+                            <tr class="border-b border-gray-100">
+                                <td class="py-2">round2_discount</td>
+                                <td class="py-2 text-blue-600">round2_flexibility</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2">round3_discount</td>
+                                <td class="py-2 text-blue-600">round3_flexibility</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="bg-white rounded-2xl p-6 border border-gray-200">
                     <h3 class="font-semibold text-lg mb-4">Example: $3,500 Load</h3>
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b border-gray-200">
                                 <th class="text-left py-2 text-gray-500">Round</th>
-                                <th class="text-left py-2 text-gray-500">Max Discount</th>
-                                <th class="text-left py-2 text-gray-500">Min Acceptable</th>
+                                <th class="text-left py-2 text-gray-500">Min Accept</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr class="border-b border-gray-100">
-                                <td class="py-3 font-medium">Round 1</td>
-                                <td class="py-3">5%</td>
-                                <td class="py-3 text-green-600 font-medium">$3,325</td>
+                                <td class="py-2">Round 1 (5%)</td>
+                                <td class="py-2 text-green-600 font-medium">$3,325</td>
                             </tr>
                             <tr class="border-b border-gray-100">
-                                <td class="py-3 font-medium">Round 2</td>
-                                <td class="py-3">10%</td>
-                                <td class="py-3 text-yellow-600 font-medium">$3,150</td>
+                                <td class="py-2">Round 2 (10%)</td>
+                                <td class="py-2 text-yellow-600 font-medium">$3,150</td>
                             </tr>
                             <tr>
-                                <td class="py-3 font-medium">Round 3</td>
-                                <td class="py-3">15%</td>
-                                <td class="py-3 text-red-600 font-medium">$2,975</td>
+                                <td class="py-2">Round 3 (15%)</td>
+                                <td class="py-2 text-red-600 font-medium">$2,975</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+            </div>
+            
+            <div class="mt-8 bg-blue-50 rounded-xl p-6 border border-blue-200">
+                <h4 class="font-semibold text-blue-900 mb-2">How to Configure in HappyRobot</h4>
+                <ol class="text-sm text-blue-800 space-y-2">
+                    <li>1. Go to <strong>Workflow Settings → Variables</strong></li>
+                    <li>2. Create variables: <code class="bg-blue-100 px-1 rounded">round1_discount</code>, <code class="bg-blue-100 px-1 rounded">round2_discount</code>, <code class="bg-blue-100 px-1 rounded">round3_discount</code></li>
+                    <li>3. In the <strong>evaluate_offer tool</strong>, add these as body parameters mapped to the workflow variables</li>
+                    <li>4. The API will use these values instead of defaults</li>
+                </ol>
             </div>
         </div>
     </section>
