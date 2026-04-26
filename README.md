@@ -124,24 +124,27 @@ Since negotiation thresholds are configurable via **HappyRobot workflow variable
 
 ```mermaid
 flowchart LR
-    subgraph A["Strategy A (Conservative)"]
-        A1[Round 1: 3%]
-        A2[Round 2: 5%]
-        A3[Round 3: 8%]
+    subgraph A["Current Strategy"]
+        A0[Markup: 5%]
+        A1[Round 1: 5% off quoted]
+        A2[Round 2: 7% off quoted]
+        A3[Round 3: 8% off quoted]
     end
-    
+
     subgraph B["Strategy B (Aggressive)"]
-        B1[Round 1: 5%]
-        B2[Round 2: 10%]
-        B3[Round 3: 15%]
+        B0[Markup: 10%]
+        B1[Round 1: 5% off quoted]
+        B2[Round 2: 10% off quoted]
+        B3[Round 3: 15% off quoted]
     end
-    
-    subgraph C["Strategy C (Flexible)"]
-        C1[Round 1: 10%]
-        C2[Round 2: 15%]
-        C3[Round 3: 20%]
+
+    subgraph C["Strategy C (Max Bookings)"]
+        C0[Markup: 5%]
+        C1[Round 1: 10% off quoted]
+        C2[Round 2: 12% off quoted]
+        C3[Round 3: 15% off quoted]
     end
-    
+
     A --> M[Measure: Conversion Rate, Avg Margin]
     B --> M
     C --> M
@@ -152,11 +155,11 @@ flowchart LR
 1. **Create multiple workflow versions** (or use environments: staging/production)
 2. **Set different variable values** for each version:
 
-| Strategy | round1_discount | round2_discount | round3_discount | Use Case |
-|----------|-----------------|-----------------|-----------------|----------|
-| Conservative | 0.03 | 0.05 | 0.08 | Maximize margin |
-| Balanced | 0.05 | 0.10 | 0.15 | Default behavior |
-| Aggressive | 0.08 | 0.15 | 0.20 | Maximize bookings |
+| Strategy | markup | round1_flexibility | round2_flexibility | round3_flexibility | Use Case |
+|---|---|---|---|---|---|
+| **Current** | 0.05 | 0.05 | 0.07 | 0.08 | Balanced — margin + bookings |
+| Aggressive | 0.10 | 0.05 | 0.10 | 0.15 | Maximize margin |
+| Max Bookings | 0.05 | 0.10 | 0.12 | 0.15 | Fill loads fast |
 
 3. **Route traffic** between versions
 4. **Compare metrics** in the dashboard:
@@ -166,20 +169,21 @@ flowchart LR
 
 ### API Parameters
 
-The `evaluate_offer` endpoint accepts optional overrides:
+The `evaluate_offer` endpoint accepts all 4 variables from HappyRobot:
 
 ```json
 {
   "load_id": "LD-2026-0123",
   "carrier_offer": 3000,
   "round_number": 1,
+  "markup_percentage": 0.05,
   "round1_flexibility": 0.05,
-  "round2_flexibility": 0.10,
-  "round3_flexibility": 0.15
+  "round2_flexibility": 0.07,
+  "round3_flexibility": 0.08
 }
 ```
 
-If not provided, defaults to 5%/10%/15%.
+If not provided, defaults to no markup (0%) and 5%/10%/15% flexibility.
 
 ## Data Flow
 
@@ -430,33 +434,56 @@ flowchart LR
 
 ## Negotiation Logic
 
-```mermaid
-flowchart TD
-    A[Carrier Offer] --> B{Round 1}
-    B -->|≥95% of rate| C[✅ Accept]
-    B -->|<95%| D{Round 2}
-    D -->|≥90% of rate| C
-    D -->|<90%| E{Round 3}
-    E -->|≥85% of rate| C
-    E -->|<85%| F[❌ No Deal]
-    
-    C --> G[Record Agreement]
-    G --> H[Transfer to Sales]
-    
-    style C fill:#c8e6c9
-    style F fill:#ffcdd2
+The agent quotes carriers a **marked-up price** above the internal loadboard rate, then negotiates down — but never below the loadboard rate (the hard floor).
+
+```
+quoted_price    = loadboard_rate × (1 + markup_percentage)
+min_acceptable  = max(quoted_price × (1 - round_flexibility), loadboard_rate)
 ```
 
-| Round | Max Discount | Strategy |
-|-------|--------------|----------|
-| 1 | 5% | Hold firm, emphasize load value |
-| 2 | 10% | Show flexibility, find middle ground |
-| 3 | 15% | Final offer, maximum flexibility |
+```mermaid
+flowchart TD
+    A[Carrier Offer] --> B[quoted_price = loadboard × 1 + markup]
+    B --> C{Round 1}
+    C -->|offer ≥ quoted × 0.95| D[✅ Accept]
+    C -->|offer < quoted × 0.95| E{Round 2}
+    E -->|offer ≥ quoted × 0.93| D
+    E -->|offer < quoted × 0.93| F{Round 3}
+    F -->|offer ≥ quoted × 0.92| D
+    F -->|offer < quoted × 0.92| G[❌ No Deal]
 
-**Example:** Load rate is $3,500
-- Round 1: Accept if offer ≥ $3,325 (5% off)
-- Round 2: Accept if offer ≥ $3,150 (10% off)
-- Round 3: Accept if offer ≥ $2,975 (15% off)
+    D --> H[Record Agreement]
+    H --> I[Transfer to Sales]
+
+    J[loadboard_rate] -->|hard floor — never go below| C
+    J --> E
+    J --> F
+
+    style D fill:#c8e6c9
+    style G fill:#ffcdd2
+    style J fill:#fff3e0
+```
+
+### HappyRobot Workflow Variables
+
+| Variable | Value | Description |
+|---|---|---|
+| `markup_percentage` | `0.05` | Quote carrier 5% above loadboard rate |
+| `round1_flexibility` | `0.05` | Accept if offer ≥ 95% of quoted price |
+| `round2_flexibility` | `0.07` | Accept if offer ≥ 93% of quoted price |
+| `round3_flexibility` | `0.08` | Accept if offer ≥ 92% of quoted price (final) |
+
+### Example: Load rate $3,500 with current settings
+
+```
+quoted_price = $3,500 × 1.05 = $3,675  ← agent quotes this to carrier
+
+Round 1 floor = max($3,675 × 0.95, $3,500) = max($3,491.25, $3,500) = $3,500
+Round 2 floor = max($3,675 × 0.93, $3,500) = max($3,417.75, $3,500) = $3,500
+Round 3 floor = max($3,675 × 0.92, $3,500) = max($3,381.00, $3,500) = $3,500
+```
+
+With a 5% markup and tight flexibility, the loadboard rate is the effective floor across all rounds. Best case: carrier accepts at $3,675 (5% margin). Worst case: deal closes at $3,500 (break even).
 
 ## Database Schema
 
