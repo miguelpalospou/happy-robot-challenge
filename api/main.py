@@ -70,21 +70,16 @@ async def health_check():
 
 @app.get("/")
 async def root():
-    """Serve dashboard or API info"""
-    static_index = os.path.join(os.path.dirname(__file__), "static", "index.html")
-    if os.path.exists(static_index):
-        return FileResponse(static_index)
-    return {
-        "message": "Happy Robot - Inbound Carrier Sales API",
-        "docs": "/docs",
-        "health": "/health",
-        "dashboard": "/static/index.html"
-    }
+    """Serve landing page"""
+    landing = os.path.join(os.path.dirname(__file__), "static", "landing.html")
+    if os.path.exists(landing):
+        return FileResponse(landing)
+    return {"message": "Happy Robot - Inbound Carrier Sales API", "docs": "/docs"}
 
 
 @app.get("/dashboard")
 async def dashboard():
-    """Serve dashboard"""
+    """Serve analytics dashboard"""
     static_index = os.path.join(os.path.dirname(__file__), "static", "index.html")
     if os.path.exists(static_index):
         return FileResponse(static_index)
