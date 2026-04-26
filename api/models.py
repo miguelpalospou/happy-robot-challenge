@@ -125,6 +125,9 @@ class NegotiationEvaluateResponse(BaseModel):
     message: str
     round_number: int
     can_continue: bool = Field(description="Whether more negotiation rounds are available")
+    round1_min: Optional[float] = None
+    round2_min: Optional[float] = None
+    round3_min: Optional[float] = None
 
 
 class NegotiationCreateRequest(BaseModel):

@@ -484,6 +484,17 @@ round3_flexibility = 0.08  # 8%</pre>
                     <li>4. The API enforces the loadboard floor automatically — no risk of agreeing below cost</li>
                 </ol>
             </div>
+
+            <div class="mt-4 bg-green-50 rounded-xl p-6 border border-green-200">
+                <h4 class="font-semibold text-green-900 mb-2">⚡ In-Memory Round Thresholds</h4>
+                <p class="text-sm text-green-800 mb-3">The <code class="bg-green-100 px-1 rounded">evaluate_offer</code> response now includes all 3 round minimums in one call. On round 1, store them as workflow variables — rounds 2 &amp; 3 need no extra API call.</p>
+                <div class="bg-gray-900 rounded-xl p-4 text-xs font-mono text-gray-300">
+                    <p class="text-gray-500">// Response from round 1 evaluate_offer</p>
+                    <p><span class="text-yellow-400">"round1_min"</span>: 3283.97  <span class="text-gray-500">← store as {{round1_min}}</span></p>
+                    <p><span class="text-yellow-400">"round2_min"</span>: 3214.83  <span class="text-gray-500">← store as {{round2_min}}</span></p>
+                    <p><span class="text-yellow-400">"round3_min"</span>: 3180.26  <span class="text-gray-500">← store as {{round3_min}}</span></p>
+                </div>
+            </div>
         </div>
     </section>
 

@@ -204,6 +204,24 @@ The `evaluate_offer` endpoint accepts both naming conventions from HappyRobot:
 
 `round1_flexibility` / `round1_discount` are both accepted — use whichever matches your HappyRobot variable names. Defaults to no markup (0%) and 5%/10%/15% flexibility if not provided.
 
+The response now includes **all 3 round thresholds** on every call, so HappyRobot can store them as workflow variables on round 1 and skip re-querying on rounds 2 and 3:
+
+```json
+{
+  "is_acceptable": false,
+  "quoted_price": 3456.81,
+  "min_acceptable_rate": 3283.97,
+  "suggested_counter": 3141.99,
+  "round_number": 1,
+  "can_continue": true,
+  "round1_min": 3283.97,
+  "round2_min": 3214.83,
+  "round3_min": 3180.26
+}
+```
+
+**Recommended HappyRobot setup:** On round 1, map `round1_min`, `round2_min`, `round3_min` to workflow variables. For rounds 2–3, the agent can compare the carrier's offer against those stored values without an extra API call.
+
 ## Data Flow
 
 ```mermaid
@@ -719,13 +737,37 @@ docker run -p 8000:8000 --env-file .env happy-robot-api
 
 ## Local Development
 
+### Option 1: Docker (Recommended)
+
+```bash
+# 1. Copy environment file and add your credentials
+cp .env.example .env
+
+# 2. Run with Docker Compose
+docker-compose up --build
+
+# Or manually with Docker
+docker build -t happy-robot-api .
+docker run -p 8000:8000 --env-file .env happy-robot-api
+```
+
+### Option 2: Direct Python
+
 ```bash
 cd api
 pip install -r requirements.txt
+cp ../.env.example ../.env  # Configure your credentials
 uvicorn main:app --reload --port 8000
 ```
 
-API docs: http://localhost:8000/docs
+### Access Points
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:8000 | Dashboard |
+| http://localhost:8000/docs | API Documentation (Swagger) |
+| http://localhost:8000/redoc | API Documentation (ReDoc) |
+| http://localhost:8000/health | Health Check |
 
 ## Tech Stack
 

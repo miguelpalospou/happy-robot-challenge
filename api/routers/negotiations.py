@@ -103,7 +103,18 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
                 )
         
         can_continue = round_num < MAX_NEGOTIATION_ROUNDS and not is_acceptable
-        
+
+        # Pre-calculate all round thresholds so HappyRobot can store them in memory
+        def calc_min(r):
+            f = get_flexibility(request, r)
+            return round(max(quoted_price * (1 - f), loadboard_rate), 2)
+
+        all_round_mins = {
+            "round1_min": calc_min(1),
+            "round2_min": calc_min(2),
+            "round3_min": calc_min(3),
+        }
+
         if request.call_id:
             negotiation_record = {
                 "call_id": request.call_id,
@@ -125,7 +136,8 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
             suggested_counter=suggested_counter,
             message=message,
             round_number=round_num,
-            can_continue=can_continue
+            can_continue=can_continue,
+            **all_round_mins
         )
         
     except HTTPException:
