@@ -13,11 +13,13 @@ logger = logging.getLogger(__name__)
 
 MAX_NEGOTIATION_ROUNDS = 3
 
+DEFAULT_MARKUP = 0.0  # No markup by default (quoted = loadboard rate)
+
 # Default flexibility values (can be overridden via HappyRobot workflow variables)
 DEFAULT_FLEXIBILITY = {
-    1: 0.05,  # 5% flexibility in round 1
-    2: 0.10,  # 10% flexibility in round 2
-    3: 0.15,  # 15% flexibility in round 3 (final offer)
+    1: 0.05,  # 5% off quoted price in round 1
+    2: 0.10,  # 10% off quoted price in round 2
+    3: 0.15,  # 15% off quoted price in round 3 (final offer)
 }
 
 
@@ -67,22 +69,28 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         
         load = load_result.data[0]
         loadboard_rate = float(load["loadboard_rate"])
-        
+
+        # Calculate quoted price (what agent presents to carrier)
+        markup = request.markup_percentage if request.markup_percentage is not None else DEFAULT_MARKUP
+        quoted_price = round(loadboard_rate * (1 + markup), 2)
+
         round_num = min(request.round_number, MAX_NEGOTIATION_ROUNDS)
         flexibility = get_flexibility(request, round_num)
-        
-        logger.info(f"Round {round_num}: using {flexibility*100}% flexibility (override={getattr(request, f'round{round_num}_flexibility', None)})")
-        
-        min_acceptable = loadboard_rate * (1 - flexibility)
-        
+
+        logger.info(f"Round {round_num}: loadboard=${loadboard_rate}, quoted=${quoted_price}, flexibility={flexibility*100}%")
+
+        # Floor is the higher of (quoted * discount) and loadboard_rate — never go below cost
+        discount_floor = quoted_price * (1 - flexibility)
+        min_acceptable = round(max(discount_floor, loadboard_rate), 2)
+
         is_acceptable = request.carrier_offer >= min_acceptable
-        
+
         if is_acceptable:
             message = f"Great! We can accept ${request.carrier_offer:.2f} for this load."
             suggested_counter = None
         else:
             suggested_counter = round((request.carrier_offer + min_acceptable) / 2, 2)
-            
+
             if round_num < MAX_NEGOTIATION_ROUNDS:
                 message = (
                     f"I appreciate the offer of ${request.carrier_offer:.2f}, but our minimum "
@@ -112,7 +120,8 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         
         return NegotiationEvaluateResponse(
             is_acceptable=is_acceptable,
-            min_acceptable_rate=round(min_acceptable, 2),
+            quoted_price=quoted_price,
+            min_acceptable_rate=min_acceptable,
             suggested_counter=suggested_counter,
             message=message,
             round_number=round_num,

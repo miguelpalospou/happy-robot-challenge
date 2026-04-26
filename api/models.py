@@ -105,13 +105,15 @@ class NegotiationEvaluateRequest(BaseModel):
     round_number: int = Field(..., ge=1, le=3, description="Current negotiation round (1-3)")
     call_id: Optional[str] = None
     # Configurable thresholds (can be set from HappyRobot workflow variables)
-    round1_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 1 max discount (0.05 = 5%)")
-    round2_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 2 max discount (0.10 = 10%)")
-    round3_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 3 max discount (0.15 = 15%)")
+    markup_percentage: Optional[float] = Field(None, ge=0, le=1, description="Markup over loadboard rate to quote carrier (0.10 = 10%)")
+    round1_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 1 max discount off quoted price (0.05 = 5%)")
+    round2_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 2 max discount off quoted price (0.10 = 10%)")
+    round3_flexibility: Optional[float] = Field(None, ge=0, le=1, description="Round 3 max discount off quoted price (0.15 = 15%)")
 
 
 class NegotiationEvaluateResponse(BaseModel):
     is_acceptable: bool
+    quoted_price: float
     min_acceptable_rate: float
     suggested_counter: Optional[float] = None
     message: str
