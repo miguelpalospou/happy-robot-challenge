@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 MAX_NEGOTIATION_ROUNDS = 3
 
 
+def round50(value: float) -> float:
+    """Round to nearest $50."""
+    return round(round(value / 50) * 50, 2)
+
+
 def get_flexibility(request, round_num: int) -> float:
     """Get flexibility for a round. Accepts both round1_flexibility and round1_discount naming.
     Values must be provided via HappyRobot workflow variables — no defaults."""
@@ -72,7 +77,7 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         # quoted_price = opening offer to carrier (below loadboard by markup_percentage)
         # markup_percentage comes from HappyRobot workflow variable
         markup = request.markup_percentage if request.markup_percentage is not None else 0.0
-        quoted_price = round(loadboard_rate * (1 - markup), 2)
+        quoted_price = round50(loadboard_rate * (1 - markup))
 
         round_num = min(request.round_number, MAX_NEGOTIATION_ROUNDS)
         flexibility = get_flexibility(request, round_num)
@@ -80,7 +85,7 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         # Ceiling per round = loadboard * (1 - flexibility), goes UP each round
         # Round 1: strictest (highest discount off loadboard)
         # Round 3: loadboard rate itself = absolute ceiling
-        max_acceptable = round(loadboard_rate * (1 - flexibility), 2)
+        max_acceptable = round50(loadboard_rate * (1 - flexibility))
 
         logger.info(f"Round {round_num}: loadboard=${loadboard_rate}, quoted=${quoted_price}, max_acceptable=${max_acceptable}, carrier_offer=${request.carrier_offer}")
 
@@ -116,7 +121,7 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         # Pre-calculate all round ceilings so HappyRobot can store them on round 1
         def calc_max(r):
             f = get_flexibility(request, r)
-            return round(loadboard_rate * (1 - f), 2)
+            return round50(loadboard_rate * (1 - f))
 
         all_round_maxes = {
             "round1_max": calc_max(1),

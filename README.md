@@ -745,6 +745,30 @@ Example:
 | **Project Overview** | https://miguelpalospou.github.io/happy-robot-challenge/ |
 | **GitHub Repo** | https://github.com/miguelpalospou/happy-robot-challenge |
 
+### Credentials for Reviewers
+
+To test the API, you'll need the following credentials (shared separately via email/secure channel):
+
+| Credential | Purpose | How to Use |
+|------------|---------|------------|
+| `API_KEY` | Authenticate API requests | Add header: `X-API-Key: <value>` |
+| `SUPABASE_URL` | Database connection (if reproducing locally) | Set in `.env` file |
+| `SUPABASE_SERVICE_KEY` | Database access (if reproducing locally) | Set in `.env` file |
+
+**Quick Test (with API key):**
+
+```bash
+# Test the API
+curl -H "X-API-Key: PROVIDED_KEY" \
+  "https://happyrobot-production-03c4.up.railway.app/loads?limit=5"
+
+# Verify a carrier
+curl -H "X-API-Key: PROVIDED_KEY" \
+  "https://happyrobot-production-03c4.up.railway.app/carriers/verify/1234567"
+```
+
+**Note:** The Dashboard at the root URL works without authentication for demo purposes.
+
 ### Reproduce Deployment (Railway)
 
 **Prerequisites:**
