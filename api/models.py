@@ -65,6 +65,7 @@ class Load(BaseModel):
     delivery_datetime: datetime
     equipment_type: str
     loadboard_rate: float
+    quoted_price: Optional[float] = None
     notes: Optional[str] = None
     weight: Optional[float] = None
     commodity_type: Optional[str] = None
