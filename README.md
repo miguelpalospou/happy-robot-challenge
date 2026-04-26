@@ -82,6 +82,104 @@ flowchart TD
 | `evaluate_offer` | POST `/negotiations/evaluate` | Check if carrier's price offer is acceptable |
 | `record_agreement` | PUT `/calls/{id}/agreement` | Lock in deal, book load, prepare transfer |
 | `classify_outcome` | PUT `/calls/{id}/classify` | Tag call with outcome and sentiment |
+| `log_call` | POST `/calls/log` | Create/update call record |
+
+## Agent Northstars (Behavioral Guidelines)
+
+These rules are configured in HappyRobot UI and govern agent behavior:
+
+```mermaid
+flowchart LR
+    subgraph MUST["✅ Agent MUST"]
+        A[Ask MC first]
+        B[Use friendly tone]
+        C[Complete negotiation before agreement]
+        D[Record agreement before transfer]
+        E[Confirm deal details]
+        F[Only agree to approved rates]
+    end
+    
+    subgraph NEVER["❌ Agent must NEVER"]
+        G[Disclose loadboard_rate]
+        H[Agree without evaluate_offer]
+        I[Skip negotiation rounds]
+    end
+```
+
+| # | Northstar | Description |
+|---|-----------|-------------|
+| 1 | **Ask for MC Number** | At call start, request: "Could you give me your MC number so I can pull up your information?" |
+| 2 | **Friendly Professional Tone** | Greet warmly, speak professionally, efficiently, and knowledgeably |
+| 3 | **Negotiation Before Agreement** | All negotiation rounds (up to 3) must conclude before recording agreement |
+| 4 | **Agreement Before Transfer** | Must call `record_agreement` and confirm deal details before transferring to sales rep |
+| 5 | **Rate Confidentiality** | **NEVER** disclose `loadboard_rate` to carrier - no exact numbers, ranges, or hints |
+| 6 | **Agreed Price Transfer** | When `evaluate_offer` returns accepted, confirm details and transfer call |
+| 7 | **Agreed Rate Within Range** | Only agree to rates explicitly approved by `evaluate_offer` - never agree without calling it first |
+
+## A/B Testing Negotiation Strategies
+
+Since negotiation thresholds are configurable via **HappyRobot workflow variables** (not hardcoded), you can run A/B tests on different pricing strategies without deploying code.
+
+### How It Works
+
+```mermaid
+flowchart LR
+    subgraph A["Strategy A (Conservative)"]
+        A1[Round 1: 3%]
+        A2[Round 2: 5%]
+        A3[Round 3: 8%]
+    end
+    
+    subgraph B["Strategy B (Aggressive)"]
+        B1[Round 1: 5%]
+        B2[Round 2: 10%]
+        B3[Round 3: 15%]
+    end
+    
+    subgraph C["Strategy C (Flexible)"]
+        C1[Round 1: 10%]
+        C2[Round 2: 15%]
+        C3[Round 3: 20%]
+    end
+    
+    A --> M[Measure: Conversion Rate, Avg Margin]
+    B --> M
+    C --> M
+```
+
+### Setup in HappyRobot
+
+1. **Create multiple workflow versions** (or use environments: staging/production)
+2. **Set different variable values** for each version:
+
+| Strategy | round1_discount | round2_discount | round3_discount | Use Case |
+|----------|-----------------|-----------------|-----------------|----------|
+| Conservative | 0.03 | 0.05 | 0.08 | Maximize margin |
+| Balanced | 0.05 | 0.10 | 0.15 | Default behavior |
+| Aggressive | 0.08 | 0.15 | 0.20 | Maximize bookings |
+
+3. **Route traffic** between versions
+4. **Compare metrics** in the dashboard:
+   - Conversion rate (bookings / calls)
+   - Average margin (premium earned %)
+   - Negotiation rounds to close
+
+### API Parameters
+
+The `evaluate_offer` endpoint accepts optional overrides:
+
+```json
+{
+  "load_id": "LD-2026-0123",
+  "carrier_offer": 3000,
+  "round_number": 1,
+  "round1_flexibility": 0.05,
+  "round2_flexibility": 0.10,
+  "round3_flexibility": 0.15
+}
+```
+
+If not provided, defaults to 5%/10%/15%.
 
 ## Data Flow
 
