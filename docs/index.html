@@ -172,7 +172,6 @@
                         subgraph Database["Supabase PostgreSQL"]
                             J[(Loads)]
                             K[(Calls)]
-                            L[(Negotiations)]
                             M[SQL Functions]
                         end
                         
@@ -187,10 +186,10 @@
                         D --> E & F & G & H
                         E --> J
                         F -.->|FMCSA SAFER| P[External API]
-                        G --> L
+                        G --> K
                         H --> K
                         I --> M
-                        M --> J & K & L
+                        M --> J & K
                         N --> I
                         O --> I
                         
@@ -341,17 +340,11 @@
                             string outcome
                             string sentiment
                             uuid load_id FK
+                            decimal opening_quote
+                            int negotiation_rounds
+                            int round_closed
                         }
                         
-                        NEGOTIATIONS {
-                            uuid id PK
-                            uuid call_id FK
-                            int round_number
-                            decimal carrier_offer
-                            string status
-                        }
-                        
-                        CALLS ||--o{ NEGOTIATIONS : has
                         CALLS ||--o| LOADS : books
                 </div>
             </div>

@@ -29,13 +29,11 @@ flowchart TB
     subgraph DB["🗄️ Supabase"]
         G[(Loads)]
         H[(Calls)]
-        I[(Negotiations)]
     end
     
     B --> C & D & E & F
     C & F --> G
-    F --> H
-    E --> I
+    E & F --> H
 ```
 
 ## HappyRobot Workflow
@@ -301,15 +299,6 @@ erDiagram
         string sentiment "positive"
     }
     
-    NEGOTIATIONS {
-        uuid id PK
-        uuid call_id FK
-        int round_number "1"
-        decimal carrier_offer "3000.00"
-        string status "accepted"
-    }
-    
-    CALLS ||--o{ NEGOTIATIONS : has
     CALLS ||--o| LOADS : books
 ```
 
@@ -586,25 +575,13 @@ erDiagram
         timestamp transferred_at
         timestamp created_at
         timestamp updated_at
+        decimal opening_quote "initial offer to carrier"
+        decimal carrier_first_offer
+        int negotiation_rounds "1-3"
+        int round_closed "which round closed deal"
     }
     
-    NEGOTIATIONS {
-        uuid id PK
-        uuid call_id FK
-        uuid load_id FK
-        int round_number "1-3"
-        decimal initial_rate
-        decimal carrier_offer
-        decimal counter_offer
-        decimal final_rate
-        string status "pending|accepted|rejected"
-        timestamp created_at
-        timestamp updated_at
-    }
-    
-    CALLS ||--o{ NEGOTIATIONS : "has rounds"
     CALLS ||--o| LOADS : "books"
-    NEGOTIATIONS ||--o| LOADS : "for"
 ```
 
 ### Tables Summary
@@ -612,8 +589,7 @@ erDiagram
 | Table | Purpose | Records |
 |-------|---------|---------|
 | `loads` | Freight loads inventory | 1000+ diverse routes |
-| `calls` | Call records with carrier info, outcomes, sentiment | Per call |
-| `negotiations` | Negotiation rounds (max 3 per call) | Per round |
+| `calls` | Call records with carrier info, outcomes, negotiation tracking | Per call |
 
 ### Database Indexes
 
@@ -708,7 +684,7 @@ All metrics computed in PostgreSQL (not in-memory) for scalability:
 | `get_load_metrics()` | available, booked, equipment_breakdown | Load stats |
 | `get_top_lanes(n)` | Top N origin→destination by bookings | Top lanes table |
 | `get_pricing_analysis()` | avg_discount_pct, total_agreed_value | Margin analysis |
-| `get_negotiation_metrics()` | total_negotiations, avg_rounds | Negotiation stats |
+| `get_negotiation_metrics()` | avg_rounds, round_close_distribution | Negotiation stats (from calls) |
 
 ### Margin Analysis
 
