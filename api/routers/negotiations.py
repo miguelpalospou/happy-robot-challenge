@@ -4,8 +4,7 @@ import logging
 from database import get_supabase
 from models import (
     NegotiationEvaluateRequest, 
-    NegotiationEvaluateResponse,
-    NegotiationCreateRequest
+    NegotiationEvaluateResponse
 )
 
 router = APIRouter()
@@ -129,19 +128,20 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
             "round3_max": calc_max(3),
         }
 
+        # Update calls table with negotiation tracking (if call_id provided)
         if request.call_id and request.carrier_offer is not None:
-            negotiation_record = {
-                "call_id": request.call_id,
-                "load_id": load["id"],
-                "round_number": round_num,
-                "initial_rate": loadboard_rate,
-                "carrier_offer": request.carrier_offer,
-                "counter_offer": suggested_counter,
-                "final_rate": request.carrier_offer if is_acceptable else None,
-                "status": "accepted" if is_acceptable else "counter_offered"
+            update_data = {
+                "negotiation_rounds": round_num,
+                "opening_quote": quoted_price,
             }
-
-            supabase.table("negotiations").insert(negotiation_record).execute()
+            # Track first offer from carrier
+            if round_num == 1:
+                update_data["carrier_first_offer"] = request.carrier_offer
+            # Track which round closed the deal
+            if is_acceptable:
+                update_data["round_closed"] = round_num
+            
+            supabase.table("calls").update(update_data).eq("call_id", request.call_id).execute()
 
         return NegotiationEvaluateResponse(
             is_acceptable=is_acceptable,
@@ -161,44 +161,3 @@ async def evaluate_counter_offer(request: NegotiationEvaluateRequest):
         raise HTTPException(status_code=500, detail=f"Error evaluating offer: {str(e)}")
 
 
-@router.post("/create")
-async def create_negotiation(request: NegotiationCreateRequest):
-    """Create a new negotiation record."""
-    try:
-        supabase = get_supabase()
-        
-        negotiation_record = {
-            "call_id": request.call_id,
-            "load_id": request.load_id,
-            "round_number": 1,
-            "initial_rate": request.initial_rate,
-            "carrier_offer": request.carrier_offer,
-            "status": "pending"
-        }
-        
-        result = supabase.table("negotiations").insert(negotiation_record).execute()
-        
-        return {"message": "Negotiation created", "negotiation": result.data[0]}
-        
-    except Exception as e:
-        logger.error(f"Error creating negotiation: {e}")
-        raise HTTPException(status_code=500, detail=f"Error creating negotiation: {str(e)}")
-
-
-@router.get("/call/{call_id}")
-async def get_negotiations_for_call(call_id: str):
-    """Get all negotiation rounds for a call."""
-    try:
-        supabase = get_supabase()
-        
-        result = supabase.table("negotiations")\
-            .select("*")\
-            .eq("call_id", call_id)\
-            .order("round_number")\
-            .execute()
-        
-        return {"call_id": call_id, "negotiations": result.data, "total_rounds": len(result.data)}
-        
-    except Exception as e:
-        logger.error(f"Error getting negotiations: {e}")
-        raise HTTPException(status_code=500, detail=f"Error getting negotiations: {str(e)}")
