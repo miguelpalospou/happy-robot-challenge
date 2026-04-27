@@ -2,6 +2,27 @@
 
 AI-powered system for automating inbound carrier calls for freight brokerage load sales.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Tools Available to AI Agent](#tools-available-to-ai-agent)
+- [API Endpoints](#api-endpoints)
+- [Deployment](#deployment)
+- [Security](#security)
+- [Local Development](#local-development)
+
+**Detailed Documentation:**
+- [HappyRobot Workflow](#happyrobot-workflow)
+- [Agent Northstars](#agent-northstars-behavioral-guidelines)
+- [A/B Testing](#ab-testing-negotiation-strategies)
+- [Search Features](#search-features)
+- [Negotiation Logic](#negotiation-logic)
+- [Database Schema](#database-schema)
+- [Dashboard & Metrics](#dashboard--metrics)
+
+---
+
 ## Overview
 
 This system handles inbound calls from carriers looking to book loads:
