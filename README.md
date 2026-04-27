@@ -816,7 +816,7 @@ docker run -p 8000:8000 --env-file .env happy-robot-api
 ```bash
 cd api
 pip install -r requirements.txt
-cp ../.env.example ../.env  # Configure your credentials
+cp ../.env.example .env  # fills credentials into api/.env — where the app looks
 uvicorn main:app --reload --port 8000
 ```
 
