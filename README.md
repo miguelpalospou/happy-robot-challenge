@@ -14,12 +14,12 @@ AI-powered system for automating inbound carrier calls for freight brokerage loa
 
 **Detailed Documentation:**
 - [HappyRobot Workflow](#happyrobot-workflow)
-- [Agent Northstars](#agent-northstars-behavioral-guidelines)
-- [A/B Testing](#ab-testing-negotiation-strategies)
 - [Search Features](#search-features)
 - [Negotiation Logic](#negotiation-logic)
+- [A/B Testing](#ab-testing-negotiation-strategies)
 - [Database Schema](#database-schema)
 - [Dashboard & Metrics](#dashboard--metrics)
+- [Agent Northstars (Evaluators)](#agent-northstars-behavioral-guidelines)
 
 ---
 
@@ -102,38 +102,6 @@ flowchart TD
 | `record_agreement` | PUT `/calls/{id}/agreement` | Lock in deal, book load, prepare transfer |
 | `classify_outcome` | PUT `/calls/{id}/classify` | Tag call with outcome and sentiment |
 | `log_call` | POST `/calls/log` | Create/update call record |
-
-## Agent Northstars (Behavioral Guidelines)
-
-These rules are configured in HappyRobot UI and govern agent behavior:
-
-```mermaid
-flowchart LR
-    subgraph MUST["✅ Agent MUST"]
-        A[Ask MC first]
-        B[Use friendly tone]
-        C[Complete negotiation before agreement]
-        D[Record agreement before transfer]
-        E[Confirm deal details]
-        F[Only agree to approved rates]
-    end
-    
-    subgraph NEVER["❌ Agent must NEVER"]
-        G[Disclose loadboard_rate]
-        H[Agree without evaluate_offer]
-        I[Skip negotiation rounds]
-    end
-```
-
-| # | Northstar | Description |
-|---|-----------|-------------|
-| 1 | **Ask for MC Number** | At call start, request: "Could you give me your MC number so I can pull up your information?" |
-| 2 | **Friendly Professional Tone** | Greet warmly, speak professionally, efficiently, and knowledgeably |
-| 3 | **Negotiation Before Agreement** | All negotiation rounds (up to 3) must conclude before recording agreement |
-| 4 | **Agreement Before Transfer** | Must call `record_agreement` and confirm deal details before transferring to sales rep |
-| 5 | **Rate Confidentiality** | **NEVER** disclose `loadboard_rate` to carrier - no exact numbers, ranges, or hints |
-| 6 | **Agreed Price Transfer** | When `evaluate_offer` returns accepted, confirm details and transfer call |
-| 7 | **Agreed Rate Within Range** | Only agree to rates explicitly approved by `evaluate_offer` - never agree without calling it first |
 
 ## A/B Testing Negotiation Strategies
 
@@ -922,6 +890,38 @@ API_KEY=your-secure-api-key-here
 | `FMCSA_WEBKEY` | No | FMCSA API key (falls back to HTML scraping if not set) |
 | `DEBUG` | No | Enable debug mode (default: false) |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
+
+## Agent Northstars (Behavioral Guidelines)
+
+These rules are configured in HappyRobot UI as evaluators to monitor agent behavior:
+
+```mermaid
+flowchart LR
+    subgraph MUST["✅ Agent MUST"]
+        A[Ask MC first]
+        B[Use friendly tone]
+        C[Complete negotiation before agreement]
+        D[Record agreement before transfer]
+        E[Confirm deal details]
+        F[Only agree to approved rates]
+    end
+    
+    subgraph NEVER["❌ Agent must NEVER"]
+        G[Disclose loadboard_rate]
+        H[Agree without evaluate_offer]
+        I[Skip negotiation rounds]
+    end
+```
+
+| # | Northstar | Description |
+|---|-----------|-------------|
+| 1 | **Ask for MC Number** | At call start, request MC number to verify carrier |
+| 2 | **Friendly Professional Tone** | Greet warmly, speak professionally |
+| 3 | **Negotiation Before Agreement** | Complete all rounds before recording agreement |
+| 4 | **Agreement Before Transfer** | Call `record_agreement` before transferring to sales |
+| 5 | **Rate Confidentiality** | **NEVER** disclose `loadboard_rate` to carrier |
+| 6 | **Agreed Price Transfer** | When accepted, confirm details and transfer |
+| 7 | **Agreed Rate Within Range** | Only agree to rates approved by `evaluate_offer` |
 
 ## Tech Stack
 
