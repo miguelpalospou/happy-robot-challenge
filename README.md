@@ -640,10 +640,10 @@ flowchart LR
     end
     
     subgraph API["⚡ FastAPI"]
-        D[/metrics/summary]
-        E[/metrics/calls]
-        F[/metrics/loads]
-        G[/metrics/lanes]
+        D["/metrics/summary"]
+        E["/metrics/calls"]
+        F["/metrics/loads"]
+        G["/metrics/lanes"]
     end
     
     subgraph SQL["🐘 PostgreSQL Functions"]
