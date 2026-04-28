@@ -444,49 +444,64 @@ WHERE (origin ILIKE '%Houston%' OR origin ILIKE '%Dallas%' OR origin ILIKE '%Aus
 
 ### How It Works
 
+Verification is done by **scraping the FMCSA SAFER public website** directly — no API key required. When the agent calls `verify_carrier`, we send an HTTP request to:
+
+```
+https://safer.fmcsa.dot.gov/query.asp?searchtype=ANY&query_type=queryCarrierSnapshot&query_param=MC_MX&query_string={mc_number}
+```
+
+- `query_param=MC_MX` — tells SAFER to search by Motor Carrier number
+- `query_string=123456` — the MC number (we strip any `MC-` prefix automatically)
+
+We parse the HTML response to extract legal name, DOT number, operating status, and authority type.
+
 ```mermaid
 flowchart LR
-    A[MC Number] --> B{SAFER Website}
-    B --> C[Parse HTML]
-    C --> D{Status?}
+    A[MC Number] --> B{FMCSA SAFER HTML}
+    B --> C[Parse HTML response]
+    C --> D{Operating Status?}
     D -->|AUTHORIZED| E[✅ is_eligible: true]
     D -->|NOT AUTHORIZED| F[❌ is_eligible: false]
     D -->|INACTIVE| G[❌ is_eligible: false]
 ```
 
+> **Note:** FMCSA blocks direct browser access (403 Forbidden) but allows server-to-server requests. The API works fine from Railway — the browser error is expected.
+
 ### Test MC Numbers
 
 | MC Number | Status | Carrier |
 |-----------|--------|---------|
-| `133655` | ✅ AUTHORIZED | SCHNEIDER NATIONAL |
-| `999999` | ✅ AUTHORIZED | TLA TRUCKING LLC |
-| `12345` | ❌ INACTIVE | - |
-| `11111` | ❌ INACTIVE | - |
+| `123456` | ✅ AUTHORIZED | B MARRON LOGISTICS LLC |
+| `13446` | ✅ AUTHORIZED | TINO'S TRANSPORTATION LLC |
+| `133655` | ✅ AUTHORIZED | SCHNEIDER NATIONAL CARRIERS INC |
+| `12345` | ❌ INACTIVE | — |
 
 ## Negotiation Logic
 
-The agent quotes carriers a **marked-up price** above the internal loadboard rate, then negotiates down — but never below the loadboard rate (the hard floor).
+The agent quotes carriers a price **below** the loadboard rate, keeping the spread as broker margin. Each negotiation round, the ceiling rises — but never above the loadboard rate (the hard floor for broker cost).
 
 ```
-quoted_price    = loadboard_rate × (1 + markup_percentage)
-min_acceptable  = max(quoted_price × (1 - round_flexibility), loadboard_rate)
+quoted_price    = loadboard_rate × (1 − markup_percentage)   ← agent opens here
+round_ceiling   = loadboard_rate × (1 − round_flexibility)   ← rises each round
 ```
+
+The broker earns: `loadboard_rate − agreed_rate`. The carrier never sees the loadboard rate.
 
 ```mermaid
 flowchart TD
-    A[Carrier Offer] --> B[quoted_price = loadboard × 1 + markup]
+    A[Carrier calls in] --> B[quoted_price = loadboard × 0.85]
     B --> C{Round 1}
-    C -->|offer ≥ quoted × 0.95| D[✅ Accept]
-    C -->|offer < quoted × 0.95| E{Round 2}
-    E -->|offer ≥ quoted × 0.93| D
-    E -->|offer < quoted × 0.93| F{Round 3}
-    F -->|offer ≥ quoted × 0.92| D
-    F -->|offer < quoted × 0.92| G[❌ No Deal]
+    C -->|offer ≤ round1_ceiling| D[✅ Accept]
+    C -->|offer > round1_ceiling| E{Round 2}
+    E -->|offer ≤ round2_ceiling| D
+    E -->|offer > round2_ceiling| F{Round 3}
+    F -->|offer ≤ loadboard_rate| D
+    F -->|offer > loadboard_rate| G[❌ No Deal]
 
     D --> H[Record Agreement]
-    H --> I[Transfer to Sales]
+    H --> I[Transfer to Sales Rep]
 
-    J[loadboard_rate] -->|hard floor — never go below| C
+    J[loadboard_rate] -->|hard ceiling — never pay above| C
     J --> E
     J --> F
 
@@ -499,22 +514,24 @@ flowchart TD
 
 | Variable | Value | Description |
 |---|---|---|
-| `markup_percentage` | `0.15` | Quote carrier 15% above loadboard rate |
-| `round1_flexibility` | `0.05` | Accept if offer ≥ 95% of quoted price |
-| `round2_flexibility` | `0.07` | Accept if offer ≥ 93% of quoted price |
-| `round3_flexibility` | `0.08` | Accept if offer ≥ 92% of quoted price (final) |
+| `markup_percentage` | `0.15` | Quote carrier 15% below loadboard rate |
+| `round1_flexibility` | `0.08` | Round 1 ceiling: loadboard × (1 − 0.08) |
+| `round2_flexibility` | `0.05` | Round 2 ceiling: loadboard × (1 − 0.05) |
+| `round3_flexibility` | `0.00` | Round 3 ceiling: loadboard rate (hard max) |
 
-### Example: Load rate $3,500 with current settings
+### Example: Loadboard rate $3,000 with current settings
 
 ```
-quoted_price = $3,500 × 1.15 = $4,025  ← agent quotes this to carrier
+quoted_price  = $3,000 × (1 − 0.15) = $2,550   ← agent opens here
 
-Round 1 floor = max($4,025 × 0.95, $3,500) = max($3,823.75, $3,500) = $3,823.75
-Round 2 floor = max($4,025 × 0.93, $3,500) = max($3,743.25, $3,500) = $3,743.25
-Round 3 floor = max($4,025 × 0.92, $3,500) = max($3,703.00, $3,500) = $3,703.00
+Round 1 ceiling = $3,000 × (1 − 0.08) = $2,760  ← accept if carrier asks ≤ $2,760
+Round 2 ceiling = $3,000 × (1 − 0.05) = $2,850  ← accept if carrier asks ≤ $2,850
+Round 3 ceiling = $3,000 × (1 − 0.00) = $3,000  ← accept up to loadboard rate
+
+All amounts rounded to nearest $50 by the API.
 ```
 
-With a 15% markup and tight flexibility, the agent has real margin room. Best case: carrier accepts at $4,025 (15% margin). Worst case: deal closes at $3,703 (~5.8% margin). Loadboard rate is protected in all scenarios.
+Best case: carrier accepts $2,550 (broker earns $450). Worst case: deal closes at $3,000 (broker breaks even). Loadboard rate is never disclosed.
 
 ## Database Schema
 
@@ -618,11 +635,14 @@ flowchart LR
 
 ### Call Outcomes
 - `load_booked` - Deal closed
-- `transferred_to_rep` - Agreed price, transferred to sales
-- `no_agreement` - Negotiation failed
-- `carrier_declined` - Carrier not interested
-- `no_matching_loads` - No loads for carrier's criteria
-- `verification_failed` - MC number invalid
+- `transferred_to_rep` - Agreed price, transferred to sales rep
+- `no_agreement` - Negotiation failed (carrier asked too much)
+- `carrier_declined` - Carrier not interested in the load
+- `no_matching_loads` - No loads matched carrier's criteria
+- `verification_failed` - MC number invalid or carrier not authorized
+- `caller_hung_up` - Carrier disconnected before completing flow
+- `not_interested` - Carrier declined immediately
+- `abandoned` - Call dropped or incomplete
 
 ### Sentiment Classification
 - `very_positive`, `positive`, `neutral`, `negative`, `very_negative`
@@ -677,19 +697,20 @@ All metrics computed in PostgreSQL (not in-memory) for scalability:
 
 ### Margin Analysis
 
-Tracks negotiation effectiveness:
+Tracks broker margin across booked deals:
 
 ```
-Premium Earned = (agreed_rate / loadboard_rate - 1) × 100%
+Broker Margin % = (loadboard_rate − agreed_rate) / loadboard_rate × 100%
+Margin Earned $ = loadboard_rate − agreed_rate  (per deal, summed across all deals)
 
 Example:
-  Loadboard rate: $2,000
-  Agreed rate:    $3,000
-  Premium:        +50% (carriers paying MORE than listed)
+  Loadboard rate: $3,000
+  Agreed rate:    $2,550  (carrier accepted opening offer)
+  Broker margin:  +15% / +$450
 ```
 
-- **Green (+%)**: Carriers paid above loadboard rate (good!)
-- **Red (-%)**: Discount given to carriers
+- **Green (+%)**: We paid the carrier below loadboard — broker keeps the spread
+- **Red (−%)**: We paid above loadboard — over market rate (should not happen)
 
 ## Environment Variables
 
@@ -761,7 +782,6 @@ railway init
 railway variables set SUPABASE_URL="https://your-project.supabase.co"
 railway variables set SUPABASE_SERVICE_KEY="your-service-key"
 railway variables set API_KEY="your-secure-api-key"
-railway variables set FMCSA_WEBKEY="your-fmcsa-key"  # Optional
 
 # 5. Deploy
 railway up
@@ -785,13 +805,16 @@ Contact the project owner for read-only credentials or request access via Supaba
 2. Go to SQL Editor and run migrations in order:
 
 ```bash
-# Run migrations in order
-psql $DATABASE_URL < supabase/migrations/001_initial_schema.sql
-psql $DATABASE_URL < supabase/migrations/002_add_indexes.sql
-psql $DATABASE_URL < supabase/migrations/003_generated_loads.sql
-psql $DATABASE_URL < supabase/migrations/004_add_carrier_to_loads.sql
-psql $DATABASE_URL < supabase/migrations/005_metrics_functions.sql
+# Run migrations in order via Supabase SQL Editor
+001_initial_schema.sql       # Core tables: loads, calls
+002_add_indexes.sql          # Performance indexes
+003_generated_loads.sql      # Seed 1000+ loads
+004_add_carrier_to_loads.sql # Carrier assignment columns
+005_metrics_functions.sql    # PostgreSQL aggregation functions
+006_flatten_negotiations.sql # Adds negotiation tracking to calls table
 ```
+
+> Run each file in the Supabase Dashboard → SQL Editor. Direct `psql` connections may be blocked depending on network.
 
 Or via Supabase Dashboard: SQL Editor → paste each migration file.
 
@@ -887,7 +910,6 @@ API_KEY=your-secure-api-key-here
 | `SUPABASE_URL` | Yes | Supabase project URL |
 | `SUPABASE_SERVICE_KEY` | Yes | Supabase service role key (not anon key) |
 | `API_KEY` | Yes | API authentication key for webhooks |
-| `FMCSA_WEBKEY` | No | FMCSA API key (falls back to HTML scraping if not set) |
 | `DEBUG` | No | Enable debug mode (default: false) |
 | `LOG_LEVEL` | No | Logging level (default: INFO) |
 
